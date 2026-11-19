@@ -2,6 +2,45 @@
 
 Angular 19 + TypeScript + Bootstrap + Firebase (Firestore).
 
+## Deploy en GitHub Pages
+
+- **Repositorio:** https://github.com/Daniel-494847/Estadistica-Oscar-Alfaro
+- **URL publicada:** https://daniel-494847.github.io/Estadistica-Oscar-Alfaro/
+- **Fuente de Pages:** rama `gh-pages`, carpeta `/ (root)` (ya configurada).
+
+Cada vez que haya cambios, publica así:
+
+```powershell
+# 1) Compilar con la ruta base del proyecto (importante)
+npm ci
+npm run build -- --base-href /Estadistica-Oscar-Alfaro/
+
+# 2) Subir el código fuente a main
+git add .
+git commit -m "Actualiza la app"
+git push 2026 main
+
+# 3) Publicar el build en gh-pages
+$dir = 'C:\Users\EQUIPO\AppData\Local\Temp\opencode\ghpages-estadistica'
+if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+git worktree prune
+git worktree add -B gh-pages $dir
+Get-ChildItem $dir -Force | Where-Object { $_.Name -ne '.git' } | Remove-Item -Recurse -Force
+Copy-Item 'dist\cuadros\browser\*' $dir -Recurse -Force
+New-Item (Join-Path $dir '.nojekyll') -ItemType File -Force | Out-Null
+Push-Location $dir
+git add -A
+git commit -m "Deploy Angular app a GitHub Pages"
+git push 2026 gh-pages --force
+Pop-Location
+git worktree remove $dir --force
+git worktree prune
+```
+
+Si alguna vez se pierde la configuración, en GitHub entra a **Settings → Pages → Build and deployment** y elige **Deploy from a branch → gh-pages / (root)**. Espera 1–2 minutos y abre la URL publicada.
+
+El icono que se muestra al compartir el enlace está en `src/icono.png` (512×512), el favicon en `src/favicon.png` y los metadatos `og:*` / `twitter:*` en `src/index.html`.
+
 ## Estado
 
 - Proyecto Firebase configurado: `estadisticas-3b3c2`.
