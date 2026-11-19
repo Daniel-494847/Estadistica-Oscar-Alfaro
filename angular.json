@@ -14,6 +14,7 @@
           "options": {
             "outputPath": "dist/cuadros",
             "index": "src/index.html",
+            "assets": ["src/favicon.png", "src/icono.png"],
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
