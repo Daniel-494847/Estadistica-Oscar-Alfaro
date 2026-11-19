@@ -36,12 +36,12 @@ import { IMG } from './imagenes';
             <div class="small mb-3">Elige un trimestre o descarga los tres.</div>
             <div class="menu-panel__pdf-controls">
               <div class="row g-2">
-                <div class="col-6"><label class="form-label small fw-bold">Cuadro</label>
+                <div class="col-12 col-sm-6"><label class="form-label small fw-bold">Cuadro</label>
                   <select class="form-select form-select-sm" [value]="pdfTipo()" (change)="pdfTipo.set($any($event.target).value)">
                     @for (o of tipos; track o[0]) { <option [value]="o[0]">{{ o[1] }}</option> }
                   </select>
                 </div>
-                <div class="col-6"><label class="form-label small fw-bold">Trimestre</label>
+                <div class="col-12 col-sm-6"><label class="form-label small fw-bold">Trimestre</label>
                   <select class="form-select form-select-sm" [value]="pdfTrim()" (change)="pdfTrim.set(+$any($event.target).value)">
                     <option value="0">Todos (3 archivos)</option>
                     @for (t of trimestres; track t) { <option [value]="t">{{ t }}º trimestre</option> }
@@ -63,44 +63,48 @@ import { IMG } from './imagenes';
 
     <!-- 2. FORMULARIO POR GRADO -->
     @if (vista() === 'form') {
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <button class="btn btn-danger btn-lg fw-bold shadow" (click)="vista.set('menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
-        <h2 class="h4 mb-0">{{ nombreTipo() }}</h2>
+      <div class="row g-2 align-items-center mb-3">
+        <div class="col-12 col-sm-auto order-2 order-sm-1">
+          <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="vista.set('menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
+        </div>
+        <div class="col-12 col-sm order-1 order-sm-2">
+          <h2 class="h4 mb-0 text-center text-sm-start">{{ nombreTipo() }}</h2>
+        </div>
       </div>
-      <div class="card card-body mb-3"><div class="row g-3 align-items-end">
-        <div class="col-md-4"><label class="form-label small fw-bold">Seleccione el trimestre</label>
+      <div class="card card-body mb-3"><div class="row g-2 g-md-3 align-items-end">
+        <div class="col-12 col-md-4"><label class="form-label small fw-bold">Seleccione el trimestre</label>
           <select class="form-select" (change)="cambiarTrim($any($event.target).value)">
             @for (t of trimestres; track t) { <option [value]="t" [selected]="trim() === t">{{ etiqueta(t) }}</option> }
           </select></div>
-        <div class="col-md-4"><label class="form-label small fw-bold">Grado / Paralelo</label>
+        <div class="col-12 col-md-4"><label class="form-label small fw-bold">Grado / Paralelo</label>
           <select class="form-select" (change)="grado.set($any($event.target).value)">
             @for (g of grados; track g) { <option [value]="g" [selected]="grado() === g">{{ g }}</option> }
           </select>
           @if (!conDatos(datos(), grado())) { <div class="small text-warning mt-1">Sin datos registrados para este grado</div> }
         </div>
-        <div class="col-md-4"><button class="btn btn-primary w-100" (click)="cargar()">⟳ Cargar Datos</button></div>
+        <div class="col-12 col-md-4"><button class="btn btn-primary w-100" (click)="cargar()">⟳ Cargar Datos</button></div>
       </div></div>
 
       @if (tipo() === 'promret') {
-        <div class="row g-3 mb-3">
-          <div class="col-md-4"><div class="card card-body bg-primary text-white"><small class="fw-bold">ESTUDIANTES EFECTIVOS</small>
+        <div class="row g-2 g-md-3 mb-3">
+          <div class="col-12 col-md-4"><div class="card card-body bg-primary text-white"><small class="fw-bold">ESTUDIANTES EFECTIVOS</small>
             <input type="number" class="form-control" [value]="cur()['efec'] ?? ''" (input)="set('efec', $any($event.target).value)" (wheel)="bloquearScroll($event)"></div></div>
-          <div class="col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">TOTAL PROMOVIDOS</small>
+          <div class="col-12 col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">TOTAL PROMOVIDOS</small>
             <input type="number" class="form-control" [class.is-invalid]="bad(totCol())" [value]="cur()['t_prom'] ?? ''" (input)="set('t_prom', $any($event.target).value)" (wheel)="bloquearScroll($event)"></div></div>
-          <div class="col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">TOTAL RETENIDOS</small>
+          <div class="col-12 col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">TOTAL RETENIDOS</small>
             <input type="number" class="form-control" [class.is-invalid]="bad(totRetCol())" [value]="cur()['t_ret'] ?? ''" (input)="set('t_ret', $any($event.target).value)" (wheel)="bloquearScroll($event)">
           </div></div>
         </div>
       }
 
-      <div class="table-responsive"><table class="table table-bordered align-middle text-center bg-white">
+      <div class="table-responsive rounded border bg-white"><table class="table table-sm table-bordered align-middle text-center bg-white small mb-0">
         <thead class="table-light"><tr>
-          <th class="text-start">Área de Conocimiento</th>
+          <th class="text-start position-sticky start-0 bg-light z-1">Área de Conocimiento</th>
           @for (c of cabecera(); track c.key) { <th>{{ tipo() === 'promedio' ? 'Promedio' : c.titulo }}</th> }
         </tr></thead>
         <tbody>
           @for (a of areas; track a[0]) {
-            <tr><td class="text-start fw-semibold">{{ a[1] }}</td>
+            <tr><td class="text-start fw-semibold position-sticky start-0 bg-white z-1">{{ a[1] }}</td>
               @for (c of colsDe(a[0]); track c.key) {
                 <td [class.fw-bold]="!c.entrada">
                   @if (c.entrada) {
@@ -114,44 +118,51 @@ import { IMG } from './imagenes';
       </table></div>
 
       @if (tipo() === 'promedio') {
-        <div class="row g-3 mb-3">
-          <div class="col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">PROMEDIO DE GRADO (automático)</small><div class="fs-4 fw-bold">{{ fila()['prom'] }}</div></div></div>
-          <div class="col-md-4"><label class="form-label small fw-bold">Criterio de evaluación</label>
+        <div class="row g-2 g-md-3 mb-3">
+          <div class="col-12 col-md-6"><div class="card card-body"><small class="fw-bold text-secondary">PROMEDIO DE GRADO (automático)</small><div class="fs-4 fw-bold">{{ fila()['prom'] }}</div></div></div>
+          <div class="col-12 col-md-6"><label class="form-label small fw-bold">Criterio de evaluación</label>
             <input class="form-control" [value]="cur()['crit'] ?? ''" (input)="set('crit', $any($event.target).value)"></div>
         </div>
       }
 
-      <div class="d-flex flex-wrap gap-2 align-items-center">
+      <div class="d-grid gap-2 d-sm-flex flex-sm-wrap align-items-sm-center mt-3">
         <button class="btn btn-primary" (click)="pdfPreparado.set(false); vista.set('previa')">🖨 Vista Previa e Imprimir</button>
         <button class="btn btn-success" (click)="guardar()">💾 Guardar Registro</button>
-        <span class="small text-muted">{{ cargando() ? 'Procesando...' : msg() }}</span>
+        <span class="small text-muted text-center text-sm-start w-100">{{ cargando() ? 'Procesando...' : msg() }}</span>
       </div>
 
       @if (guardado()) {
         <div class="alert alert-success mt-3 text-center"><h5>¡Guardado Exitosamente!</h5>
-          <button class="btn btn-primary me-2" (click)="otro()">+ Registrar Otro Curso</button>
-          <button class="btn btn-danger btn-lg fw-bold shadow" (click)="guardado.set(false); vista.set('menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú Principal</button></div>
+          <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+            <button class="btn btn-primary" (click)="otro()">+ Registrar Otro Curso</button>
+            <button class="btn btn-danger btn-lg fw-bold shadow" (click)="guardado.set(false); vista.set('menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú Principal</button>
+          </div>
+        </div>
       }
     }
   </div>
 
   <!-- 3. VISTA PREVIA / IMPRESIÓN: el cuadro completo con el formato del Excel -->
   @if (vista() === 'previa') {
-    <div class="no-print container-fluid bg-light border-bottom py-2 d-flex gap-2 align-items-center flex-wrap">
-      <button class="btn btn-outline-secondary btn-sm" (click)="vista.set('form')">← Volver</button>
-      <button class="btn btn-success btn-sm" (click)="exportarActual()">⬇ Excel (este cuadro)</button>
-      <button class="btn btn-danger btn-sm" (click)="descargarPDF()" [disabled]="cargando()">⬇ PDF</button>
-      @if (pdfPreparado()) {
-        <span class="badge text-bg-danger">Vista previa · {{ nombreTipo() }} · {{ pdfTrim() === 0 ? 'todos los trimestres' : pdfTrim() + 'º trimestre' }}</span>
-        @if (pdfTrim() === 0) {
-          <button class="btn btn-danger btn-sm fw-bold" (click)="descargarPDFs()" [disabled]="cargando()">
-            <i class="bi bi-download me-1"></i>Descargar los 3 PDF
-          </button>
+    <div class="no-print container-fluid bg-light border-bottom py-2">
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <button class="btn btn-outline-secondary btn-sm" (click)="vista.set('form')">← Volver</button>
+        <button class="btn btn-success btn-sm" (click)="exportarActual()">⬇ Excel (este cuadro)</button>
+        <button class="btn btn-danger btn-sm" (click)="descargarPDF()" [disabled]="cargando()">⬇ PDF</button>
+        @if (pdfPreparado()) {
+          <span class="badge text-bg-danger">Vista previa · {{ nombreTipo() }} · {{ pdfTrim() === 0 ? 'todos los trimestres' : pdfTrim() + 'º trimestre' }}</span>
+          @if (pdfTrim() === 0) {
+            <button class="btn btn-danger btn-sm fw-bold" (click)="descargarPDFs()" [disabled]="cargando()">
+              <i class="bi bi-download me-1"></i>Descargar los 3 PDF
+            </button>
+          }
         }
-      }
-      <button class="btn btn-outline-primary btn-sm" (click)="window.print()">🖨 Imprimir</button>
-      <label class="small ms-3">Gestión <input class="form-control form-control-sm d-inline-block" style="width:80px" [value]="gestion()" (input)="gestion.set($any($event.target).value)"></label>
-      <span class="small text-muted">{{ cargando() ? 'Generando...' : msg() }}</span>
+        <button class="btn btn-outline-primary btn-sm" (click)="window.print()">🖨 Imprimir</button>
+      </div>
+      <div class="d-flex gap-2 align-items-center flex-wrap mt-2">
+        <label class="small mb-0">Gestión <input class="form-control form-control-sm d-inline-block w-auto" size="4" [value]="gestion()" (input)="gestion.set($any($event.target).value)"></label>
+        <span class="small text-muted">{{ cargando() ? 'Generando...' : msg() }}</span>
+      </div>
     </div>
     <div class="hoja">
       <div class="cab">
@@ -199,10 +210,16 @@ import { IMG } from './imagenes';
   <!-- 4. GRÁFICOS ESTADÍSTICOS DE LA UNIDAD EDUCATIVA -->
   @if (vista() === 'graficos') {
     <div class="container-fluid no-print">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <button class="btn btn-danger btn-lg fw-bold shadow" (click)="salir()"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
-        <h2 class="h4 mb-0">Gráficos Estadísticos · Unidad Educativa "Oscar Alfaro"</h2>
-        <span class="small text-muted">{{ cargando() ? 'Cargando datos...' : msg() }}</span>
+      <div class="row g-2 align-items-center mb-3">
+        <div class="col-12 col-sm-auto">
+          <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="salir()"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
+        </div>
+        <div class="col-12 col-sm">
+          <h2 class="h5 mb-0 text-center text-sm-start">Gráficos Estadísticos · Unidad Educativa "Oscar Alfaro"</h2>
+        </div>
+        <div class="col-12 col-sm-auto text-center">
+          <span class="small text-muted">{{ cargando() ? 'Cargando datos...' : msg() }}</span>
+        </div>
       </div>
       <div class="row g-4">
         <div class="col-lg-6"><div class="card h-100">
@@ -223,15 +240,21 @@ import { IMG } from './imagenes';
         </div></div>
       </div>
       <div class="card mt-4">
-        <div class="card-body d-flex flex-wrap align-items-center gap-3">
-          <label for="informeTrim" class="fw-bold mb-0">Descargar informe por trimestre:</label>
-          <select id="informeTrim" class="form-select w-auto" [value]="informeTrim()" (change)="informeTrim.set(+$any($event.target).value)">
-            @for (t of trimestres; track t) { <option [value]="t">{{ t }}º trimestre</option> }
-          </select>
-          <button class="btn btn-primary" (click)="descargarInformeWord()" [disabled]="generandoInforme()">
-            {{ generandoInforme() ? 'Generando...' : '⬇ Descargar informe Word' }}
-          </button>
-          <span class="small text-muted">{{ informeMsg() }}</span>
+        <div class="card-body">
+          <div class="row g-2 align-items-center">
+            <div class="col-12 col-md-auto"><label for="informeTrim" class="fw-bold mb-0">Descargar informe por trimestre:</label></div>
+            <div class="col-12 col-sm-6 col-md-3">
+              <select id="informeTrim" class="form-select" [value]="informeTrim()" (change)="informeTrim.set(+$any($event.target).value)">
+                @for (t of trimestres; track t) { <option [value]="t">{{ t }}º trimestre</option> }
+              </select>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+              <button class="btn btn-primary w-100" (click)="descargarInformeWord()" [disabled]="generandoInforme()">
+                {{ generandoInforme() ? 'Generando...' : '⬇ Descargar informe Word' }}
+              </button>
+            </div>
+            <div class="col-12"><span class="small text-muted">{{ informeMsg() }}</span></div>
+          </div>
         </div>
       </div>
     </div>
