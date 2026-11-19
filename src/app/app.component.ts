@@ -235,7 +235,7 @@ import { IMG } from './imagenes';
           <div class="card-body py-2"><div style="height:275px"><canvas id="grafTemas"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenTemas() }}</div></div>
         </div></div>
         <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Promedios (todo general)</div>
+          <div class="card-header fw-bold">Promedios</div>
           <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromedios"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromedio() }}</div></div>
         </div></div>
       </div>
@@ -475,26 +475,27 @@ export class AppComponent {
       crear('grafPromRet', {
         type: 'bar',
         plugins: [etiquetasValores((v, ds, di, i) => {
-          if (ds.yAxisID === 'y1') return `${Math.round(v)}%`;
+          // El porcentaje ya va en la barra: no se repite sobre la línea.
+          if (ds.yAxisID === 'y1') return '';
           const porc = di === 0 ? promret[i]['t_pp'] : promret[i]['t_pr'];
           return `${Math.round(v)} (${Math.round(num(porc))}%)`;
         })],
         data: { labels: etiquetas, datasets: [
           { label: 'Aprobados', data: promret.map(x => num(x['t_prom'])), backgroundColor: '#198754', yAxisID: 'y' },
           { label: 'Retenidos', data: promret.map(x => num(x['t_ret'])), backgroundColor: '#dc3545', yAxisID: 'y' },
-          { type: 'line', label: '% Aprobados', data: promret.map(x => num(x['t_pp'])), borderColor: '#146c43', backgroundColor: '#146c43', yAxisID: 'y1', tension: 0.3, pointRadius: 4, fill: false },
-          { type: 'line', label: '% Retenidos', data: promret.map(x => num(x['t_pr'])), borderColor: '#b02a37', backgroundColor: '#b02a37', yAxisID: 'y1', tension: 0.3, pointRadius: 4, fill: false },
+          { type: 'line', label: '% Aprobados', data: promret.map(x => num(x['t_pp'])), borderColor: '#146c43', backgroundColor: '#146c43', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
+          { type: 'line', label: '% Retenidos', data: promret.map(x => num(x['t_pr'])), borderColor: '#b02a37', backgroundColor: '#b02a37', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
         ] }, options: opciones(undefined, true),
       });
       crear('grafTemas', {
         type: 'bar',
         plugins: [etiquetasValores((v, ds, _di, i) => ds.yAxisID === 'y1'
-          ? `${Math.round(v)}%`
+          ? ''
           : `${Math.round(v)} (${Math.round(num(temas[i]['t_pct']))}%)`)],
         data: { labels: etiquetas, datasets: [
           { label: 'Programados', data: temas.map(x => num(x['t_prog'])), backgroundColor: '#0d6efd', yAxisID: 'y' },
           { label: 'Avanzados', data: temas.map(x => num(x['t_avanz'])), backgroundColor: '#6610f2', yAxisID: 'y' },
-          { type: 'line', label: '% Avanzados', data: temas.map(x => num(x['t_pct'])), borderColor: '#3a0ca3', backgroundColor: '#3a0ca3', yAxisID: 'y1', tension: 0.3, pointRadius: 4, fill: false },
+          { type: 'line', label: '% Avanzados', data: temas.map(x => num(x['t_pct'])), borderColor: '#3a0ca3', backgroundColor: '#3a0ca3', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
         ] }, options: opciones(undefined, true),
       });
       crear('grafPromedios', {

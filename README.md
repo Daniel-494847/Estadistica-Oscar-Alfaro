@@ -79,7 +79,7 @@ El PDF se genera con `html2canvas` + `jspdf`; el Excel con `xlsx-js-style` y `ff
   - **Generales de cada trimestre**: porcentajes de temas avanzados, promovidos y retenidos.
   - **Retenidos y aprobados**: cantidad de estudiantes en cada condición y línea de porcentaje de aprobados/retenidos (eje derecho).
   - **Temas programados y avanzados**: cantidades por trimestre y línea de porcentaje de temas avanzados (eje derecho).
-  - **Promedios (todo general)**: promedio general de la Unidad Educativa.
+  - **Promedios**: promedio general de la Unidad Educativa.
 
 Los porcentajes se muestran como **números enteros** con signo `%` **debajo de cada gráfico**, agrupados por trimestre y con un dato por línea, por ejemplo:
 
@@ -90,7 +90,7 @@ Promovidos 88%
 Retenidos 12%
 ```
 
-Las barras también llevan su porcentaje entero: en el gráfico general se lee `30%` sobre cada barra, y en los gráficos de conteos se lee `308 (88%)`, `482 (30%)`, etc. Las líneas de porcentaje mantienen su etiqueta con `%` y usan un eje derecho de 0 a 100. El promedio general sigue con dos decimales debajo de su gráfico.
+Las barras también llevan su porcentaje entero: en el gráfico general se lee `30%` sobre cada barra, y en los gráficos de conteos se lee `308 (88%)`, `482 (30%)`, etc. Las líneas de porcentaje se identifican en la leyenda y usan un eje derecho de 0 a 100, pero **no repiten el valor sobre cada punto** para no recargar el gráfico. El promedio general sigue con dos decimales debajo de su gráfico.
 
 Debajo de los gráficos hay un selector de trimestre y el botón **⬇ Descargar informe Word**, que genera `informe-estadistico-<t>trim.docx` con:
 
