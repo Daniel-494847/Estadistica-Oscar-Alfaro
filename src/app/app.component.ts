@@ -386,19 +386,19 @@ export class AppComponent {
       this.agregados = await this.obtenerAgregados();
       const { temas, promret, promedio }: { temas: Fila[]; promret: Fila[]; promedio: number[]; filas: any[] } = this.agregados;
       const num = (v: any) => +(String(v ?? '').replace('%', '')) || 0;
-      const pct2 = (v: any) => `${num(v).toFixed(2)}%`;
+      const pct = (v: any) => `${Math.round(num(v))}%`;
       const etiquetas = TRIMESTRES.map(t => `${t}º TRIM`);
       const porTrim = (fn: (i: number) => string) => TRIMESTRES.map((t, i) => `${t}º TRIMESTRE\n${fn(i)}`).join('\n\n');
       this.resumenGeneral.set(porTrim(i => [
-        `Temas Avanzados ${pct2(temas[i]['t_pct'])}`,
-        `Promovidos ${pct2(promret[i]['t_pp'])}`,
-        `Retenidos ${pct2(promret[i]['t_pr'])}`,
+        `Temas Avanzados ${pct(temas[i]['t_pct'])}`,
+        `Promovidos ${pct(promret[i]['t_pp'])}`,
+        `Retenidos ${pct(promret[i]['t_pr'])}`,
       ].join('\n')));
       this.resumenPromRet.set(porTrim(i => [
-        `Aprobados ${pct2(promret[i]['t_pp'])}`,
-        `Retenidos ${pct2(promret[i]['t_pr'])}`,
+        `Aprobados ${pct(promret[i]['t_pp'])}`,
+        `Retenidos ${pct(promret[i]['t_pr'])}`,
       ].join('\n')));
-      this.resumenTemas.set(porTrim(i => `Avanzados ${pct2(temas[i]['t_pct'])}`));
+      this.resumenTemas.set(porTrim(i => `Avanzados ${pct(temas[i]['t_pct'])}`));
       this.resumenPromedio.set(porTrim(i => `Promedio ${Number(promedio[i]).toFixed(2)}`));
 
       const { Chart, registerables } = await import('chart.js');
@@ -442,7 +442,7 @@ export class AppComponent {
 
       crear('grafGeneral', {
         type: 'bar',
-        plugins: [etiquetasValores(v => `${v.toFixed(2)}%`)],
+        plugins: [etiquetasValores(v => `${Math.round(v)}%`)],
         data: { labels: etiquetas, datasets: [
           { label: '% Temas avanzados', data: temas.map(x => num(x['t_pct'])), backgroundColor: '#0d6efd' },
           { label: '% Promovidos', data: promret.map(x => num(x['t_pp'])), backgroundColor: '#198754' },
@@ -452,9 +452,9 @@ export class AppComponent {
       crear('grafPromRet', {
         type: 'bar',
         plugins: [etiquetasValores((v, ds, di, i) => {
-          if (ds.yAxisID === 'y1') return `${v.toFixed(2)}%`;
+          if (ds.yAxisID === 'y1') return `${Math.round(v)}%`;
           const porc = di === 0 ? promret[i]['t_pp'] : promret[i]['t_pr'];
-          return `${Math.round(v)} (${num(porc).toFixed(2)}%)`;
+          return `${Math.round(v)} (${Math.round(num(porc))}%)`;
         })],
         data: { labels: etiquetas, datasets: [
           { label: 'Aprobados', data: promret.map(x => num(x['t_prom'])), backgroundColor: '#198754', yAxisID: 'y' },
@@ -466,8 +466,8 @@ export class AppComponent {
       crear('grafTemas', {
         type: 'bar',
         plugins: [etiquetasValores((v, ds, _di, i) => ds.yAxisID === 'y1'
-          ? `${v.toFixed(2)}%`
-          : `${Math.round(v)} (${num(temas[i]['t_pct']).toFixed(2)}%)`)],
+          ? `${Math.round(v)}%`
+          : `${Math.round(v)} (${Math.round(num(temas[i]['t_pct']))}%)`)],
         data: { labels: etiquetas, datasets: [
           { label: 'Programados', data: temas.map(x => num(x['t_prog'])), backgroundColor: '#0d6efd', yAxisID: 'y' },
           { label: 'Avanzados', data: temas.map(x => num(x['t_avanz'])), backgroundColor: '#6610f2', yAxisID: 'y' },
