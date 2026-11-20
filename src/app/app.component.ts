@@ -1,8 +1,8 @@
 import { Component, ViewEncapsulation, computed, signal } from '@angular/core';
-import { FORM_AREAS, GRADOS, TRIMESTRES, Col, Fila, Tipo, calcular, definir, gid, lineas, totales } from './config';
+import { AREAS_POR_DEFECTO, Area, CAMPOS_NOMBRES, GRADOS, TRIMESTRES, Col, Fila, Tipo, calcular, definir, gid, lineas, totales } from './config';
 import { AuthService } from './auth.service';
 import { ExportService } from './export.service';
-import { FirebaseService } from './firebase.service';
+import { COLECCION_DEFECTO, Colegio, FirebaseService, IDS_CUADRO, SLUG_DEFECTO } from './firebase.service';
 import { IMG } from './imagenes';
 
 @Component({
@@ -12,7 +12,7 @@ import { IMG } from './imagenes';
   template: `
   <div class="container py-3 no-print" [class.app-panel]="vista() !== 'menu'">
     <!-- Acceso administrador: botón pequeño siempre visible arriba a la izquierda -->
-    <div class="d-flex justify-content-start mb-2 no-print">
+    <div class="d-flex justify-content-start align-items-center flex-wrap gap-2 mb-2 no-print">
       @if (admin()) {
         <button class="btn btn-sm btn-outline-success shadow-sm fw-bold" (click)="vista.set('admin')" title="Panel del administrador">
           <i class="bi bi-shield-check me-1"></i>Administrador
@@ -24,6 +24,13 @@ import { IMG } from './imagenes';
         <button class="btn btn-sm btn-outline-warning shadow-sm fw-bold" (click)="abrirAdmin()" title="Ingresar como administrador">
           <i class="bi bi-box-arrow-in-right me-1"></i>Ingresar administrador
         </button>
+      }
+      @if (admin()) {
+        <select class="form-select form-select-sm w-auto shadow-sm" [value]="slugActual()" (change)="cambiarColegio($any($event.target).value)" title="Unidad educativa">
+          @for (c of colegiosLista(); track c.slug) { <option [value]="c.slug">{{ c.nombre }}</option> }
+        </select>
+      } @else {
+        <span class="badge text-bg-light border small shadow-sm">{{ nombreUE() }}</span>
       }
     </div>
 
@@ -42,7 +49,7 @@ import { IMG } from './imagenes';
     @if (vista() === 'menu') {
       <section class="menu-panel">
         <div class="menu-panel__intro">
-          <span class="menu-panel__badge"><i class="bi bi-mortarboard-fill me-2"></i>U.E. "OSCAR ALFARO" · GESTIÓN 2026</span>
+          <span class="menu-panel__badge"><i class="bi bi-mortarboard-fill me-2"></i>U.E. "{{ nombreUE() }}" · GESTIÓN {{ gestion() }}</span>
           <h2 class="menu-panel__title">Menú Principal</h2>
           <p class="menu-panel__subtitle">Seleccione una opción para gestionar el registro estadístico</p>
         </div>
@@ -126,6 +133,74 @@ import { IMG } from './imagenes';
             </div>
           </div>
           <div class="card card-body mb-3">
+            <h3 class="h6 mb-3"><i class="bi bi-building me-2"></i>Unidades educativas</h3>
+            <div class="small mb-2">
+              @for (c of colegiosLista(); track c.slug) {
+                <div class="d-flex align-items-center justify-content-between gap-2 border rounded px-2 py-1 mb-1">
+                  <span class="fw-semibold">{{ c.nombre }} <small class="text-muted">({{ c.coleccion }})</small></span>
+                  <span class="d-flex gap-2 align-items-center">
+                    <button class="btn btn-sm btn-outline-primary" (click)="cambiarColegio(c.slug)">Usar</button>
+                    <button class="btn btn-sm btn-outline-danger" (click)="quitarColegio(c.slug)" title="Descarga un respaldo JSON y elimina la unidad"><i class="bi bi-trash3"></i></button>
+                  </span>
+                </div>
+              }
+            </div>
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-bold">Nueva unidad educativa</label>
+                <input class="form-control" [value]="nuevaUE()" (input)="nuevaUE.set($any($event.target).value)" placeholder="Ej. COLEGIO SAN FRANCISCO">
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-bold">Escudo o imagen identificativa</label>
+                <input class="form-control form-control-sm" type="file" accept="image/*" (change)="elegirEscudo($event)">
+              </div>
+              <div class="col-12 col-md-2">
+                @if (escudoNuevo()) { <img [src]="escudoNuevo()" alt="Escudo" style="height:48px" class="border rounded"> }
+              </div>
+              <div class="col-12 col-md-2"><button class="btn btn-success w-100" (click)="crearColegio()">Crear</button></div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+              <button class="btn btn-sm btn-outline-primary" (click)="copiarLink()"><i class="bi bi-link-45deg me-1"></i>Copiar enlace de esta U.E.</button>
+              <label class="btn btn-sm btn-outline-secondary mb-0"><i class="bi bi-upload me-1"></i>Importar base de datos (.json)
+                <input type="file" accept=".json,application/json" class="d-none" (change)="importarJson($event)">
+              </label>
+              <span class="small text-muted w-100">{{ colegiosMsg() || ('Enlace: ' + linkColegio()) }}</span>
+              <span class="small text-muted w-100">{{ importMsg() }}</span>
+            </div>
+          </div>
+          <div class="card card-body mb-3">
+            <h3 class="h6 mb-3"><i class="bi bi-journal-bookmark me-2"></i>Áreas de aprendizaje · {{ nombreUE() }}</h3>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              @for (a of areasCfg(); track a.id) {
+                <span class="badge text-bg-light border d-inline-flex align-items-center gap-1">
+                  {{ a.nombre }} · {{ a.campo }}
+                  <button class="btn btn-sm btn-link text-danger p-0" (click)="quitarArea(a.id)" title="Quitar área"><i class="bi bi-x-lg"></i></button>
+                </span>
+              }
+            </div>
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-md-5"><label class="form-label small fw-bold">Nueva área</label>
+                <input class="form-control" [value]="areaNombre()" (input)="areaNombre.set($any($event.target).value)" placeholder="Ej. INGLÉS"></div>
+              <div class="col-12 col-md-5"><label class="form-label small fw-bold">Grupo</label>
+                <select class="form-select" [value]="areaCampo()" (change)="areaCampo.set($any($event.target).value)">
+                  @for (c of campos; track c) { <option [value]="c">{{ c }}</option> }
+                </select></div>
+              <div class="col-12 col-md-2"><button class="btn btn-success w-100" (click)="agregarArea()">Añadir</button></div>
+            </div>
+            <div class="small text-muted mt-2">{{ areasMsg() || 'Los cambios se aplican a los tres cuadros, gráficos y Excel de esta unidad educativa.' }}</div>
+          </div>
+          <div class="card card-body mb-3">
+            <div class="row g-2 align-items-center">
+              <div class="col-12 col-sm-auto"><label for="trimPref" class="fw-bold mb-0"><i class="bi bi-calendar2-week me-2"></i>Trimestre preferido al abrir formularios</label></div>
+              <div class="col-12 col-sm-4">
+                <select id="trimPref" class="form-select form-select-sm" [value]="trimPreferido()" (change)="cambiarTrimPreferido(+$any($event.target).value)">
+                  @for (t of trimestres; track t) { <option [value]="t">{{ t }}º trimestre</option> }
+                </select>
+              </div>
+              <div class="col-12"><span class="small text-muted">{{ trimPrefMsg() || 'Se aplicará a los tres cuadros y a todos los usuarios.' }}</span></div>
+            </div>
+          </div>
+          <div class="card card-body mb-3">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
               <h3 class="h6 mb-0"><i class="bi bi-lock-fill me-2"></i>Bloquear edición por trimestre</h3>
               <div class="d-flex gap-2">
@@ -163,7 +238,7 @@ import { IMG } from './imagenes';
           <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="vista.set(admin() ? 'admin' : 'menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
         </div>
         <div class="col-12 col-sm order-1 order-sm-2">
-          <h2 class="h4 mb-0 text-center text-sm-start">{{ nombreTipo() }}
+          <h2 class="h4 mb-0 text-center fw-bold text-uppercase">{{ nombreTipo() }}
             @if (admin()) { <span class="badge text-bg-warning ms-2">Administrador</span> }
           </h2>
         </div>
@@ -206,7 +281,7 @@ import { IMG } from './imagenes';
           @for (c of cabecera(); track c.key) { <th>{{ tipo() === 'promedio' ? 'Promedio' : c.titulo }}</th> }
         </tr></thead>
         <tbody>
-          @for (a of areas; track a[0]) {
+          @for (a of areasVisibles(); track a[0]) {
             <tr><td class="text-start fw-semibold position-sticky start-0 bg-white z-1">{{ a[1] }}</td>
               @for (c of colsDe(a[0]); track c.key) {
                 <td [class.fw-bold]="!c.entrada">
@@ -269,7 +344,7 @@ import { IMG } from './imagenes';
     </div>
     <div class="hoja">
       <div class="cab">
-        <img [src]="img.escudo" alt="">
+        <img [src]="escudoUE()" alt="Escudo de la unidad educativa">
         <div>@for (l of titulos(); track $index) { <div [class.b]="$index === 0">{{ l }}</div> }</div>
         <img [src]="img.retrato" alt="">
       </div>
@@ -318,7 +393,7 @@ import { IMG } from './imagenes';
           <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="salir()"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
         </div>
         <div class="col-12 col-sm">
-          <h2 class="h5 mb-0 text-center text-sm-start">Gráficos Estadísticos · Unidad Educativa "Oscar Alfaro"</h2>
+          <h2 class="h5 mb-0 text-center text-sm-start">Gráficos Estadísticos · Unidad Educativa "{{ nombreUE() }}"</h2>
         </div>
         <div class="col-12 col-sm-auto text-center">
           <span class="small text-muted">{{ cargando() ? 'Cargando datos...' : msg() }}</span>
@@ -423,7 +498,7 @@ import { IMG } from './imagenes';
   `],
 })
 export class AppComponent {
-  window = window; img = IMG; grados = GRADOS; trimestres = TRIMESTRES; gid = gid; areas = FORM_AREAS;
+  window = window; img = IMG; grados = GRADOS; trimestres = TRIMESTRES; gid = gid; campos = CAMPOS_NOMBRES;
   tipos: [Tipo, string, string, string][] = [
     ['temas', 'Temas Programados', 'Registro anual, programado y avanzado.', 'bi-journal-check'],
     ['promedio', 'Promedios', 'Gestión y registro de promedios por área.', 'bi-calculator'],
@@ -446,18 +521,31 @@ export class AppComponent {
   admin = computed(() => this.auth.esAdmin);
   bloqueos = signal<Record<number, boolean>>({}); // edición bloqueada por trimestre
   bloqueoMsg = signal('');
+  trimPreferido = signal(1); // trimestre que se abre por defecto en los formularios
+  trimPrefMsg = signal('');
+  areasCfg = signal<Area[]>(AREAS_POR_DEFECTO); // áreas de aprendizaje de la U.E. actual
+  areasMsg = signal(''); areaNombre = signal(''); areaCampo = signal(CAMPOS_NOMBRES[0]);
+  areasVisibles = computed(() => this.areasCfg().map(a => [a.id, a.nombre] as [string, string]));
+  colegios = signal<Record<string, Colegio>>({ [SLUG_DEFECTO]: { nombre: 'OSCAR ALFARO', coleccion: COLECCION_DEFECTO } });
+  colegiosLista = computed(() => Object.entries(this.colegios()).map(([slug, c]) => ({ slug, ...c })));
+  slugActual = signal(SLUG_DEFECTO);
+  coleccion = signal(COLECCION_DEFECTO);
+  nombreUE = computed(() => this.colegios()[this.slugActual()]?.nombre ?? 'OSCAR ALFARO');
+  linkColegio = computed(() => this.linkPara(this.slugActual()));
+  nuevaUE = signal(''); colegiosMsg = signal(''); escudoNuevo = signal(''); importMsg = signal('');
+  escudoUE = computed(() => this.colegios()[this.slugActual()]?.escudo || IMG.escudo);
   trimBloqueado = computed(() => !this.admin() && !!this.bloqueos()[this.trim()]);
   resumenGeneral = signal(''); resumenPromRet = signal(''); resumenTemas = signal(''); resumenPromedio = signal('');
   agregados: any = null;
   private replicarTimers = new Map<string, any>();
 
   // Todo lo que se ve se calcula solo a partir de lo escrito
-  def = computed(() => definir(this.tipo(), this.trim(), this.admin()));
+  def = computed(() => definir(this.tipo(), this.trim(), this.admin(), this.areasCfg()));
   sub = computed(() => this.def().nArea > 1);
   todas = computed(() => [...this.def().cols, ...this.def().total]);
   filas = computed(() => this.grados.map(g => calcular(this.todas(), this.datos()[gid(g)] ?? {})));
   tot = computed(() => totales(this.todas(), this.filas()));
-  titulos = computed(() => lineas(this.tipo(), this.trim(), this.gestion()));
+  titulos = computed(() => lineas(this.tipo(), this.trim(), this.gestion(), this.nombreUE()));
   cur = computed(() => this.datos()[gid(this.grado())] ?? {});              // lo escrito del grado actual
   fila = computed(() => this.filas()[this.grados.indexOf(this.grado())]);   // lo calculado del grado actual
   cabecera = computed(() => this.def().cols.slice(0, this.def().nArea));
@@ -473,7 +561,7 @@ export class AppComponent {
   bad = (c: Col) => !!c.ok && !c.ok(this.fila());
 
   constructor(private fb: FirebaseService, private exp: ExportService, public auth: AuthService) {
-    this.cargarBloqueos();
+    this.cargarColegios();
   }
 
   // Un grado tiene datos si alguna de sus celdas tiene valor (los grados sembrados están vacíos)
@@ -482,14 +570,226 @@ export class AppComponent {
     return !!f && Object.values(f).some(v => v !== '' && v != null);
   }
 
-  abrir(t: Tipo) { this.pdfPreparado.set(false); this.tipo.set(t); this.trim.set(1); this.guardado.set(false); this.vista.set('form'); this.cargar(true); this.cargarBloqueos(); }
+  async abrir(t: Tipo) {
+    this.pdfPreparado.set(false);
+    this.tipo.set(t);
+    this.guardado.set(false);
+    this.vista.set('form');
+    await this.cargarAcceso();
+    this.trim.set(this.trimPreferido());
+    await this.cargar(true);
+  }
 
   abrirAdmin() { this.correo.set(''); this.clave.set(''); this.auth.error.set(''); this.vista.set('admin'); }
   async ingresar() { await this.auth.ingresar(this.correo(), this.clave()); }
   async salirAdmin() { await this.auth.salir(); }
 
-  async cargarBloqueos() {
-    try { this.bloqueos.set(await this.fb.leerBloqueos()); } catch { /* sin conexión: se permite editar */ }
+  async cargarColegios() {
+    try {
+      const reg = await this.fb.leerColegios();
+      this.colegios.set(reg);
+      const param = new URLSearchParams(window.location.search).get('colegio')?.toLowerCase();
+      const guardado = typeof localStorage !== 'undefined' ? localStorage.getItem('cuadros_colegio')?.toLowerCase() : null;
+      const slug = param && reg[param] ? param : (guardado && reg[guardado] ? guardado : SLUG_DEFECTO);
+      await this.cambiarColegio(slug, false);
+    } catch {
+      await this.cargarAcceso();
+    }
+  }
+
+  linkPara(slug: string) {
+    const url = new URL(window.location.href);
+    url.search = ''; url.hash = '';
+    if (slug !== SLUG_DEFECTO) url.searchParams.set('colegio', slug);
+    return url.toString();
+  }
+
+  async cambiarColegio(slug: string, avisar = true) {
+    const c = this.colegios()[slug];
+    if (!c) return;
+    this.slugActual.set(slug);
+    this.coleccion.set(c.coleccion);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('cuadros_colegio', slug);
+    const url = new URL(window.location.href);
+    if (slug === SLUG_DEFECTO) url.searchParams.delete('colegio');
+    else url.searchParams.set('colegio', slug);
+    window.history.replaceState({}, '', url.toString());
+    await this.cargarAcceso();
+    if (this.vista() === 'form') await this.cargar();
+    if (this.vista() === 'graficos') await this.abrirGraficos();
+    if (avisar) this.mostrarToast(`U.E. ${this.nombreUE()}`);
+  }
+
+  copiarLink() {
+    navigator.clipboard.writeText(this.linkColegio())
+      .then(() => this.mostrarToast('Enlace copiado'))
+      .catch(() => this.colegiosMsg.set('No se pudo copiar. Copia el enlace manualmente.'));
+  }
+
+  async elegirEscudo(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    try { this.escudoNuevo.set(await this.reducirImagen(file)); }
+    catch { this.colegiosMsg.set('No se pudo leer la imagen del escudo.'); }
+  }
+
+  private reducirImagen(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const w = 240, h = 240;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d')!;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+        const s = Math.min(w / img.width, h / img.height);
+        ctx.drawImage(img, (w - img.width * s) / 2, (h - img.height * s) / 2, img.width * s, img.height * s);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen inválida')); };
+      img.src = url;
+    });
+  }
+
+  async crearColegio() {
+    const nombre = this.nuevaUE().trim();
+    if (!nombre) { this.colegiosMsg.set('Escribe el nombre de la unidad educativa.'); return; }
+    const slug = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
+    if (this.colegios()[slug] || Object.values(this.colegios()).some(c => c.nombre.toUpperCase() === nombre.toUpperCase())) {
+      this.colegiosMsg.set('Ya existe una unidad educativa con ese nombre.'); return;
+    }
+    this.colegiosMsg.set('Creando...');
+    try {
+      const { slug, colegio } = await this.fb.crearColegio(nombre, this.escudoNuevo() || undefined);
+      const reg = { ...this.colegios(), [slug]: colegio };
+      await this.fb.guardarColegios(reg);
+      this.colegios.set(reg);
+      this.nuevaUE.set(''); this.escudoNuevo.set('');
+      this.colegiosMsg.set(`Creada. Enlace: ${this.linkPara(slug)}`);
+      await this.cambiarColegio(slug);
+    } catch (e) {
+      console.error(e);
+      this.colegiosMsg.set('No se pudo crear la unidad educativa.');
+    }
+  }
+
+  private descargarJson(obj: any, nombre: string) {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  async quitarColegio(slug: string) {
+    const c = this.colegios()[slug];
+    if (!c) return;
+    if (!window.confirm(`¿Eliminar la unidad educativa "${c.nombre}" y todos sus datos?`)) return;
+    this.colegiosMsg.set('Descargando respaldo y eliminando...');
+    try {
+      const datos = await this.fb.leerColeccion(c.coleccion);
+      this.descargarJson({ unidad: c.nombre, escudo: c.escudo, datos }, `respaldo-${slug}.json`);
+      await this.fb.borrarColegio(c.coleccion);
+      const reg = { ...this.colegios() };
+      delete reg[slug];
+      await this.fb.guardarColegios(reg);
+      this.colegios.set(reg);
+      if (this.slugActual() === slug) await this.cambiarColegio(SLUG_DEFECTO, false);
+      this.colegiosMsg.set(`Respaldo descargado y unidad educativa "${c.nombre}" eliminada.`);
+    } catch (e) {
+      console.error(e);
+      this.colegiosMsg.set('No se pudo eliminar la unidad educativa.');
+    }
+  }
+
+  async importarJson(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.importMsg.set('Importando...');
+    try {
+      const obj = JSON.parse(await file.text());
+      const datos = obj.datos ?? obj;
+      const nombre = String(obj.unidad ?? '').trim();
+      if (nombre) {
+        const existente = Object.entries(this.colegios())
+          .find(([, c]) => c.nombre.toUpperCase() === nombre.toUpperCase());
+        if (existente) {
+          await this.cambiarColegio(existente[0], false);
+        } else {
+          const { slug, colegio } = await this.fb.crearColegio(nombre, obj.escudo);
+          const reg = { ...this.colegios(), [slug]: colegio };
+          await this.fb.guardarColegios(reg);
+          this.colegios.set(reg);
+          await this.cambiarColegio(slug, false);
+        }
+      } else if (obj.escudo) {
+        const reg = { ...this.colegios(), [this.slugActual()]: { ...this.colegios()[this.slugActual()], escudo: obj.escudo } };
+        await this.fb.guardarColegios(reg);
+        this.colegios.set(reg);
+      }
+      const limpio = Object.fromEntries(Object.entries(datos)
+        .filter(([k]) => IDS_CUADRO.includes(k)));
+      if (!Object.keys(limpio).length) throw new Error('El JSON no contiene cuadros válidos');
+      await this.fb.importarDatos(limpio, this.coleccion());
+      await this.cargarAcceso();
+      if (this.vista() === 'form') await this.cargar();
+      if (this.vista() === 'graficos') await this.abrirGraficos();
+      this.importMsg.set('Base de datos importada correctamente.');
+      this.mostrarToast('Base de datos importada');
+    } catch (err) {
+      console.error(err);
+      this.importMsg.set('No se pudo importar el JSON. Revisa el formato del archivo.');
+    }
+    input.value = '';
+  }
+
+  async agregarArea() {
+    const nombre = this.areaNombre().trim();
+    if (!nombre) { this.areasMsg.set('Escribe el nombre del área.'); return; }
+    const base = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 6) || 'area';
+    let id = base, i = 2;
+    while (this.areasCfg().some(a => a.id === id)) id = base + i++;
+    await this.guardarAreasCfg([...this.areasCfg(), { id, nombre: nombre.toUpperCase(), campo: this.areaCampo() }]);
+    this.areaNombre.set('');
+  }
+
+  async quitarArea(id: string) {
+    await this.guardarAreasCfg(this.areasCfg().filter(a => a.id !== id));
+  }
+
+  private async guardarAreasCfg(areas: Area[]) {
+    this.areasCfg.set(areas);
+    this.areasMsg.set('Guardando...');
+    try {
+      await this.fb.guardarAreas(areas, this.coleccion());
+      this.areasMsg.set('Áreas guardadas.');
+    } catch {
+      this.areasMsg.set('No se pudieron guardar las áreas.');
+    }
+  }
+
+  async cargarAcceso() {
+    try {
+      const acceso = await this.fb.leerAcceso(this.coleccion());
+      this.bloqueos.set(acceso.bloqueos);
+      this.trimPreferido.set(acceso.trimPreferido);
+      this.areasCfg.set(acceso.areas);
+    } catch { /* sin conexión: se permite editar y se usan los valores por defecto */ }
+  }
+  async cambiarTrimPreferido(t: number) {
+    this.trimPreferido.set(t);
+    this.trimPrefMsg.set('Guardando...');
+    try {
+      await this.fb.guardarTrimPreferido(t, this.coleccion());
+      this.trimPrefMsg.set('Trimestre preferido guardado.');
+    } catch {
+      this.trimPrefMsg.set('No se pudo guardar el trimestre preferido.');
+    }
   }
   async cambiarBloqueo(t: number, v: boolean) {
     this.bloqueos.update(b => ({ ...b, [t]: v }));
@@ -504,7 +804,7 @@ export class AppComponent {
   private async guardarBloqueos() {
     this.bloqueoMsg.set('Guardando...');
     try {
-      await this.fb.guardarBloqueos(this.bloqueos());
+      await this.fb.guardarBloqueos(this.bloqueos(), this.coleccion());
       this.bloqueoMsg.set('Estado de bloqueo guardado.');
     } catch {
       this.bloqueoMsg.set('No se pudo guardar el estado de bloqueo.');
@@ -517,10 +817,10 @@ export class AppComponent {
   private async obtenerAgregados() {
     const docs: Record<string, any> = {};
     for (const tp of ['temas', 'promret', 'promedio'] as Tipo[]) {
-      for (const t of TRIMESTRES) docs[`${tp}_${t}`] = await this.fb.leer(`${tp}_${t}`).catch(() => null);
+      for (const t of TRIMESTRES) docs[`${tp}_${t}`] = await this.fb.leer(`${tp}_${t}`, this.coleccion()).catch(() => null);
     }
     const columnas = (tp: Tipo, t: number) => {
-      const df = definir(tp, t);
+      const df = definir(tp, t, this.admin(), this.areasCfg());
       return [...df.cols, ...df.total];
     };
     const filasDe = (tp: Tipo, t: number) => GRADOS.map(g =>
@@ -801,13 +1101,13 @@ export class AppComponent {
       try {
         for (const t of TRIMESTRES) {
           const id = `${prefijo}_${t}`;
-          const doc = await this.fb.leer(id);
+          const doc = await this.fb.leer(id, this.coleccion());
           const grado = doc?.['datos']?.[g];
           if (v === '') {
             // Si se limpia el valor, se quita el campo donde exista; no se crea un grado vacío.
-            if (grado) await this.fb.borrarCampoGrado(id, g, key);
+            if (grado) await this.fb.borrarCampoGrado(id, g, key, this.coleccion());
           } else {
-            await this.fb.guardarGrado(id, g, { ...(grado ?? {}), [key]: v }, {});
+            await this.fb.guardarGrado(id, g, { ...(grado ?? {}), [key]: v }, {}, this.coleccion());
           }
         }
         this.msg.set(`${etiqueta} replicado en los tres trimestres`);
@@ -825,7 +1125,7 @@ export class AppComponent {
   async cargar(autoGrado = false) {
     this.msg.set(''); this.cargando.set(true);
     try {
-      const d = await this.fb.leer(this.id());
+      const d = await this.fb.leer(this.id(), this.coleccion());
       const datos: Record<string, Fila | undefined> = d?.['datos'] ?? {};
       this.datos.set(datos);
       if (d?.['gestion']) this.gestion.set(d['gestion']);
@@ -857,7 +1157,7 @@ export class AppComponent {
       const fila = !this.admin() && this.tipo() === 'temas' && this.trim() !== 1
         ? Object.fromEntries(Object.entries(this.cur()).filter(([k]) => !k.endsWith('_anual')))
         : this.cur();
-      await this.fb.guardarGrado(this.id(), gid(this.grado()), fila, { gestion: this.gestion(), lugar: this.lugar() });
+      await this.fb.guardarGrado(this.id(), gid(this.grado()), fila, { gestion: this.gestion(), lugar: this.lugar() }, this.coleccion());
       this.guardado.set(true);
       this.mostrarToast('Guardado exitosamente');
     } catch { this.msg.set('No se pudo guardar (revisa la configuración de Firebase)'); }
@@ -872,7 +1172,7 @@ export class AppComponent {
   async exportar() {
     this.cargando.set(true); this.msg.set('Generando Excel...');
     try {
-      await this.exp.exportarExcelTodo(id => this.fb.leer(id));
+      await this.exp.exportarExcelTodo(id => this.fb.leer(id, this.coleccion()), this.areasCfg(), this.nombreUE(), this.escudoUE());
       this.msg.set('Excel descargado');
     } catch (e) { console.error(e); this.msg.set('No se pudo generar el Excel'); }
     this.cargando.set(false);
@@ -882,8 +1182,8 @@ export class AppComponent {
   async exportarActual() {
     this.cargando.set(true); this.msg.set('Generando Excel...');
     try {
-      const d = await this.fb.leer(this.id());
-      await this.exp.exportarExcelUno(this.tipo(), this.trim(), d);
+      const d = await this.fb.leer(this.id(), this.coleccion());
+      await this.exp.exportarExcelUno(this.tipo(), this.trim(), d, this.areasCfg(), this.nombreUE(), this.escudoUE());
       this.msg.set('Excel descargado');
     } catch (e) { console.error(e); this.msg.set('No se pudo generar el Excel'); }
     this.cargando.set(false);

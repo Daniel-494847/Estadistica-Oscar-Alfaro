@@ -10,39 +10,53 @@ export interface Col {
   ok?: (m: Fila) => boolean;                // validación (rojo si da false)
 }
 
+/** Área de aprendizaje: id estable (clave en Firestore), nombre y grupo al que pertenece. */
+export interface Area { id: string; nombre: string; campo: string }
+
 export const GRADOS = ['1ºA','1ºB','2ºA','2ºB','3ºA','3ºB','4ºA','4ºB','5ºA','5ºB','6ºA','6ºB'];
 export const TRIMESTRES = [1, 2, 3]; // los tres trimestres están habilitados
 export const gid = (g: string) => g.replace('º', ''); // id limpio para Firestore
 
-const AREAS: Record<string, string> = {
-  cl: 'COMUN. Y LENGUAJE', cs: 'C. SOCIALES', ap: 'A. P. Y VISUALES', ef: 'ED. FISICA Y DEPORTES',
-  em: 'ED. MUSICAL', mat: 'MATEMÁTICA', tt: 'TÉCNICA TECNOLÓGICA', cn: 'C. NATURALES', ver: 'V. E. Y RELIGIONES',
-};
-const CAMPOS: [string, string[]][] = [
-  ['COMUNIDAD Y SOCIEDAD', ['cl', 'cs', 'ap', 'ef', 'em']],
-  ['CIENCIA TECNOLOGÍA Y PRODUCCIÓN', ['mat', 'tt']],
-  ['VIDA, TIERRA TERRITORIO', ['cn']],
-  ['COSMOS Y PENSAMIENTO', ['ver']],
+export const CAMPOS_NOMBRES = [
+  'COMUNIDAD Y SOCIEDAD',
+  'CIENCIA TECNOLOGÍA Y PRODUCCIÓN',
+  'VIDA, TIERRA TERRITORIO',
+  'COSMOS Y PENSAMIENTO',
 ];
 
-// Áreas en el orden del formulario (nombre completo)
-export const FORM_AREAS: [string, string][] = [
-  ['cl', 'COMUNICACIÓN Y LENGUAJE'], ['cs', 'CIENCIAS SOCIALES'], ['ap', 'ARTES PLÁSTICAS Y VISUALES'],
-  ['ef', 'EDUCACIÓN FÍSICA Y DEPORTES'], ['em', 'EDUCACIÓN MUSICAL'], ['mat', 'MATEMÁTICA'],
-  ['tt', 'TÉCNICA TECNOLÓGICA'], ['cn', 'CIENCIAS NATURALES'], ['ver', 'VALORES, ESPIRITUALIDAD Y RELIGIONES'],
+/** Áreas iniciales de cualquier unidad educativa (el administrador puede cambiarlas). */
+export const AREAS_POR_DEFECTO: Area[] = [
+  { id: 'cl', nombre: 'COMUNICACIÓN Y LENGUAJE', campo: CAMPOS_NOMBRES[0] },
+  { id: 'cs', nombre: 'CIENCIAS SOCIALES', campo: CAMPOS_NOMBRES[0] },
+  { id: 'ap', nombre: 'ARTES PLÁSTICAS Y VISUALES', campo: CAMPOS_NOMBRES[0] },
+  { id: 'ef', nombre: 'EDUCACIÓN FÍSICA Y DEPORTES', campo: CAMPOS_NOMBRES[0] },
+  { id: 'em', nombre: 'EDUCACIÓN MUSICAL', campo: CAMPOS_NOMBRES[0] },
+  { id: 'mat', nombre: 'MATEMÁTICA', campo: CAMPOS_NOMBRES[1] },
+  { id: 'tt', nombre: 'TÉCNICA TECNOLÓGICA', campo: CAMPOS_NOMBRES[1] },
+  { id: 'cn', nombre: 'CIENCIAS NATURALES', campo: CAMPOS_NOMBRES[2] },
+  { id: 'ver', nombre: 'VALORES, ESPIRITUALIDAD Y RELIGIONES', campo: CAMPOS_NOMBRES[3] },
 ];
+
+// Formato usado por la vista de formulario
+export const FORM_AREAS: [string, string][] = AREAS_POR_DEFECTO.map(a => [a.id, a.nombre]);
 
 const n = (v: any) => (v === '' || v == null ? 0 : +v);
 const vacio = (v: any) => v === '' || v == null;
 const pct = (a: any, b: any, k: number) => (n(b) > 0 ? Math.round((n(a) / n(b)) * k) + '%' : '');
 
-export function definir(tipo: Tipo, t: number, admin = false) {
+export function definir(tipo: Tipo, t: number, admin = false, areas: Area[] = AREAS_POR_DEFECTO) {
   const k = t === 2 ? 34 : 33; // peso del trimestre (33+34+33 = 100)
-  const campos = CAMPOS.map(([nombre, ids]) => ({
+  const nombres = Object.fromEntries(areas.map(a => [a.id, a.nombre]));
+  // Los grupos y el orden de las áreas salen de la configuración guardada por el administrador.
+  const campos = CAMPOS_NOMBRES.map(nombre => ({
     nombre,
-    // en "promedio" el orden de las áreas del primer campo es distinto
-    areas: (tipo === 'promedio' && nombre.startsWith('COMUNIDAD') ? ['cl', 'cs', 'ef', 'em', 'ap'] : ids)
-      .map(id => ({ id, nombre: AREAS[id] })),
+    areas: areas.filter(a => a.campo === nombre),
+  })).filter(c => c.areas.length).map(c => ({
+    ...c,
+    // En "promedio" el área de artes va al final del primer grupo.
+    areas: tipo === 'promedio' && c.nombre === CAMPOS_NOMBRES[0]
+      ? [...c.areas.filter(a => a.id !== 'ap'), ...c.areas.filter(a => a.id === 'ap')]
+      : c.areas,
   }));
   const ids = campos.flatMap(c => c.areas.map(a => a.id));
   let porArea: (id: string) => Col[];
@@ -85,7 +99,7 @@ export function definir(tipo: Tipo, t: number, admin = false) {
       ok: (m: Fila) => n(m['t_ret']) <= n(m['t_efec']),
     } : c);
   } else {
-    porArea = id => [{ key: id, titulo: AREAS[id], entrada: true, tot: 'avg', ok: m => n(m[id]) <= 100 }];
+    porArea = id => [{ key: id, titulo: nombres[id] ?? id, entrada: true, tot: 'avg', ok: m => n(m[id]) <= 100 }];
     total = [
       { key: 'prom', titulo: 'PROMEDIO DE GRADO', tot: 'avg', calc: m => {
           const v = ids.map(i => m[i]).filter(x => !vacio(x));
@@ -96,7 +110,7 @@ export function definir(tipo: Tipo, t: number, admin = false) {
   }
   const cols = campos.flatMap(c => c.areas.flatMap(a => porArea(a.id).map(x => ({ ...x, area: a.nombre }))));
   total = total.map(x => ({ ...x, area: 'TOTALES' }));
-  return { campos, cols, total, nArea: porArea(ids[0]).length };
+  return { campos, cols, total, nArea: ids.length ? porArea(ids[0]).length : 0 };
 }
 
 // Valores de una fila de grado
@@ -118,13 +132,15 @@ export function totales(cols: Col[], filas: Fila[]): Fila {
 }
 
 const ORD = ['PRIMER', 'SEGUNDO', 'TERCER'];
-export function lineas(tipo: Tipo, t: number, gestion: string): string[] {
+export function lineas(tipo: Tipo, t: number, gestion: string, ue = 'OSCAR ALFARO'): string[] {
   const o = ORD[t - 1];
   const tit = {
     temas: `PORCENTAJES DE TEMAS PROGRAMADOS Y AVANZADOS DEL ${o} TRIMESTRE GESTIÓN ${gestion}`,
     promret: `PORCENTAJES DE ESTUDIANTES PROMOVIDOS Y RETENIDOS EN EL ${o} TRIMESTRE GESTIÓN ${gestion}`,
     promedio: `PROMEDIO DE GRADO DE CADA UNA DE LAS AREAS EN EL ${o} TRIMESTRE GESTIÓN ${gestion}`,
   }[tipo];
-  const ue = 'UNIDAD EDUCATIVA "OSCAR ALFARO"' + (tipo === 'temas' ? '' : ' CODIGO N° 71720001');
-  return tipo === 'promret' ? [tit, ue] : [tit, ue, 'EDUCACIÓN PRIMARIA COMUNITARIA VOCACIONAL'];
+  const nombre = ue.toUpperCase();
+  const codigo = /OSCAR ALFARO/.test(nombre) ? ' CODIGO N° 71720001' : '';
+  const ueLinea = `UNIDAD EDUCATIVA "${nombre}"` + (tipo === 'temas' ? '' : codigo);
+  return tipo === 'promret' ? [tit, ueLinea] : [tit, ueLinea, 'EDUCACIÓN PRIMARIA COMUNITARIA VOCACIONAL'];
 }

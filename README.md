@@ -45,8 +45,9 @@ El icono que se muestra al compartir el enlace está en `src/icono.png` (512×51
 
 - Proyecto Firebase configurado: `estadisticas-3b3c2`.
 - Reglas e índices de Firestore desplegados (`firebase.json`, `firestore.rules`, `firestore.indexes.json`).
-- Colección `cuadros` con los 9 documentos que usa la app
-  (3 cuadros × 3 trimestres): `temas_1..3`, `promret_1..3`, `promedio_1..3`.
+- Colección `cuadros` (U.E. Oscar Alfaro) y, si el administrador crea otras, `cuadros_<slug>`. Cada una con los 9 documentos que usa la app
+  (3 cuadros × 3 trimestres): `temas_1..3`, `promret_1..3`, `promedio_1..3`, más `acceso` con las preferencias.
+- Registro de unidades educativas y escudos en `config/colegios`.
 - Datos reales importados y verificados desde `scripts/datos-iniciales.json`
   (1º y 2º trimestre con datos; 3º trimestre vacío a la espera de carga).
 - Los 12 grados están presentes en los 6 documentos con datos (incluido `1A` en `temas_1`).
@@ -75,6 +76,16 @@ El icono que se muestra al compartir el enlace está en `src/icono.png` (512×51
 > La contraseña **no está en el código**: el bundle de Angular es público y cualquier persona podría leerla. Las credenciales viven solo en Firebase Auth.
 
 > `firestore.rules` actualmente permite lectura y escritura a todos (`if true`), por lo que la restricción de **T.PROG. ANUAL** se aplica en la interfaz. Para exigirla también en el servidor haría falta un *custom claim* de administrador y reglas por campo; dime si quieres que lo añada.
+
+### Opciones adicionales del panel
+
+- **Trimestre preferido**: el administrador elige qué trimestre se abre por defecto al entrar a cualquier cuadro. Se guarda en `<coleccion>/acceso` y aplica a todos los usuarios.
+- **Áreas de aprendizaje**: se pueden **añadir** (nombre + grupo) y **quitar** áreas. Los cambios afectan a los tres cuadros, los gráficos y el Excel de esa unidad educativa. El `id` del área es la clave usada en Firestore, por lo que quitar un área no borra sus datos históricos; solo deja de mostrarse y de contarse.
+- **Unidades educativas**: solo el administrador ve la lista y el selector. La U.E. original usa la colección `cuadros`; cada unidad nueva usa su propia colección `cuadros_<slug>` con los mismos 9 cuadros + `acceso`.
+  - Al crearla se puede subir un **escudo** (se reduce a 240×240 y se guarda como imagen incrustada en el registro). El escudo aparece en la vista previa, en los PDF y en los Excel. El nombre de la U.E. aparece en los títulos de todos los archivos generados.
+  - El panel muestra el **enlace privado de esa U.E.** (`...?colegio=<slug>`) y un botón para copiarlo. Los usuarios anónimos que abren ese enlace trabajan automáticamente en esa unidad; no pueden ver la lista de unidades.
+  - Al **eliminar** una unidad se descarga primero un **respaldo `.json`** con el nombre, el escudo y los 10 documentos, y después se borran sus datos. El respaldo se puede volver a cargar con **Importar base de datos (.json)**.
+  - El formato importado es `{ "unidad": "NOMBRE", "escudo": "data:image/...", "datos": { "temas_1": { "datos": {...} }, ... } }`. `unidad` y `escudo` son opcionales; si la unidad no existe, se crea.
 
 ## Pasos
 
@@ -147,6 +158,6 @@ Los gráficos se generan con `chart.js`, cargado bajo demanda al abrir la secci�
 
 ## Seguridad
 
-`firestore.rules` permite leer/escribir la colección `cuadros` sin exigir inicio de sesión: los tres cuadros son anónimos y el apartado de administrador usa Firebase Auth en la interfaz. El bloqueo de edición por trimestre y la restricción de `T.PROG. ANUAL` se aplican en la aplicación, no en el servidor.
+`firestore.rules` permite leer/escribir `cuadros`, `cuadros_*` y `config` sin exigir inicio de sesión: los tres cuadros son anónimos y el apartado de administrador usa Firebase Auth en la interfaz. El bloqueo de edición por trimestre, la restricción de `T.PROG. ANUAL` y el ocultamiento de la lista de unidades a usuarios anónimos se aplican en la aplicación, no en el servidor. Cualquier persona con el enlace `?colegio=<slug>` puede acceder a esa unidad.
 
 Para exigirlo también en Firestore haría falta un *custom claim* de administrador y reglas por campo (además de mover la replicación del anual a un backend autorizado).

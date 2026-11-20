@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { GRADOS, Tipo, calcular, definir, gid, lineas, totales } from './config';
+import { AREAS_POR_DEFECTO, Area, GRADOS, Tipo, calcular, definir, gid, lineas, totales } from './config';
 
 type Doc = { datos?: Record<string, any>; gestion?: string; lugar?: string } | null | undefined;
 
@@ -31,6 +31,16 @@ const S: Record<string, any> = {
 
 interface Celda { v: string | number; s: any }
 
+// Dibujo minimalista para incrustar el escudo en cada hoja del Excel.
+const DIBUJO = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+<xdr:oneCellAnchor><xdr:from><xdr:col>8</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+<xdr:ext cx="600000" cy="600000"/><xdr:pic>
+<xdr:nvPicPr><xdr:cNvPr id="1" name="Escudo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>
+<xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>
+<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="600000" cy="600000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>
+</xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+
 @Injectable({ providedIn: 'root' })
 export class ExportService {
 
@@ -38,8 +48,8 @@ export class ExportService {
     return { v: v == null ? '' : v, s };
   }
 
-  private matriz(tipo: Tipo, t: number, d: Doc) {
-    const df = definir(tipo, t);
+  private matriz(tipo: Tipo, t: number, d: Doc, areas: Area[] = AREAS_POR_DEFECTO, ue?: string) {
+    const df = definir(tipo, t, false, areas);
     const cols = [...df.cols, ...df.total];
     const n = df.nArea;
     const sub = n > 1;
@@ -101,7 +111,7 @@ export class ExportService {
       if (r === ultima) fila.forEach((_, c) => { fila[c] = { ...fila[c], s: borde(fila[c].s, { bottom: DOBLE }) }; });
     });
 
-    const titulos = lineas(tipo, t, d?.gestion ?? '2026');
+    const titulos = lineas(tipo, t, d?.gestion ?? '2026', ue);
     const pie: string[] = [];
     if (tipo === 'temas') pie.push(`PORCENTAJE DE TEMAS AVANZADOS: ${tt['t_pct'] ?? ''}`);
     if (tipo === 'promret') {
@@ -121,8 +131,8 @@ export class ExportService {
     return { titulos, mat, merges, ancho, pie, anchos, alturas };
   }
 
-  private hoja(XLSX: any, tipo: Tipo, t: number, d: Doc, nombre: string) {
-    const m = this.matriz(tipo, t, d);
+  private hoja(XLSX: any, tipo: Tipo, t: number, d: Doc, nombre: string, areas?: Area[], ue?: string) {
+    const m = this.matriz(tipo, t, d, areas, ue);
     const filas: any[][] = [];
     const merges: any[] = [];
 
@@ -154,7 +164,7 @@ export class ExportService {
   }
 
   // xlsx-js-style no escribe la configuración de impresión: se agrega al XML del libro.
-  private guardar(XLSX: any, wb: any, nombre: string) {
+  private guardar(XLSX: any, wb: any, nombre: string, escudo?: string) {
     const raw = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw as ArrayBuffer);
     const zip = unzipSync(bytes);
@@ -175,6 +185,41 @@ export class ExportService {
       }
       zip[key] = strToU8(xml);
     }
+
+    // xlsx-js-style no escribe imágenes: se agrega el escudo como parte de dibujo del XML.
+    if (escudo && /^data:image\/(png|jpeg);base64,/i.test(escudo)) {
+      const ext = /data:image\/png/i.test(escudo) ? 'png' : 'jpeg';
+      const bin = atob(escudo.slice(escudo.indexOf(',') + 1));
+      const img = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) img[i] = bin.charCodeAt(i);
+      zip[`xl/media/image1.${ext}`] = img;
+
+      const hojas = Object.keys(zip).filter(k => /^xl\/worksheets\/sheet\d+\.xml$/.test(k));
+      hojas.forEach((key, i) => {
+        const n = i + 1;
+        zip[`xl/drawings/drawing${n}.xml`] = strToU8(DIBUJO.replace('name="Escudo"', `name="Escudo${n}"`));
+        const rel = `<Relationship Id="rIdEscudo" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${n}.xml"/>`;
+        const rels = `xl/worksheets/_rels/sheet${n}.xml.rels`;
+        zip[rels] = strToU8(zip[rels]
+          ? strFromU8(zip[rels]).replace('</Relationships>', rel + '</Relationships>')
+          : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rel}</Relationships>`);
+        let xml = strFromU8(zip[key]);
+        if (!/xmlns:r=/.test(xml)) {
+          xml = xml.replace('<worksheet ', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+        }
+        zip[key] = strToU8(xml.replace('</worksheet>', '<drawing r:id="rIdEscudo"/></worksheet>'));
+      });
+
+      const ct = '[Content_Types].xml';
+      let tipos = strFromU8(zip[ct]);
+      if (!new RegExp(`Extension="${ext}"`).test(tipos)) {
+        tipos = tipos.replace(/<Types\b[^>]*>/, m => m + `<Default Extension="${ext}" ContentType="image/${ext}"/>`);
+      }
+      const overrides = hojas.map((_, i) =>
+        `<Override PartName="/xl/drawings/drawing${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`).join('');
+      zip[ct] = strToU8(tipos.replace('</Types>', overrides + '</Types>'));
+    }
+
     const blob = new Blob([zipSync(zip) as any], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
@@ -185,7 +230,7 @@ export class ExportService {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
-  async exportarExcelTodo(leer: (id: string) => Promise<any>) {
+  async exportarExcelTodo(leer: (id: string) => Promise<any>, areas?: Area[], ue?: string, escudo?: string) {
     const XLSX = await import('xlsx-js-style');
     const wb = XLSX.utils.book_new();
     const nombres: Record<string, string> = { temas: 'T. AVANZ', promret: 'PROM Y RET', promedio: 'PROM' };
@@ -193,17 +238,17 @@ export class ExportService {
       for (const t of [1, 2, 3]) {
         const nombre = `${nombres[tp]} ${t}º TRIM`;
         const d = await leer(`${tp}_${t}`).catch(() => null);
-        XLSX.utils.book_append_sheet(wb, this.hoja(XLSX, tp, t, d, nombre), nombre);
+        XLSX.utils.book_append_sheet(wb, this.hoja(XLSX, tp, t, d, nombre, areas, ue), nombre);
       }
     }
-    this.guardar(XLSX, wb, 'registro-estadistico.xlsx');
+    this.guardar(XLSX, wb, 'registro-estadistico.xlsx', escudo);
   }
 
-  async exportarExcelUno(tipo: Tipo, t: number, d: Doc) {
+  async exportarExcelUno(tipo: Tipo, t: number, d: Doc, areas?: Area[], ue?: string, escudo?: string) {
     const XLSX = await import('xlsx-js-style');
     const wb = XLSX.utils.book_new();
     const nombre = `${tipo} ${t}º TRIM`;
-    XLSX.utils.book_append_sheet(wb, this.hoja(XLSX, tipo, t, d, nombre), nombre);
-    this.guardar(XLSX, wb, `cuadros-${tipo}-${t}trim.xlsx`);
+    XLSX.utils.book_append_sheet(wb, this.hoja(XLSX, tipo, t, d, nombre, areas, ue), nombre);
+    this.guardar(XLSX, wb, `cuadros-${tipo}-${t}trim.xlsx`, escudo);
   }
 }
