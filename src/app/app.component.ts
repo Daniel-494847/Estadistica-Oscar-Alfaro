@@ -479,14 +479,17 @@ import { IMG } from './imagenes';
     .toast-guardado { animation: toast-in .2s ease-out; }
     .hoja { max-width: 1250px; margin: 12px auto; padding: 8px; background: #fff; font-family: Cambria, serif; }
     .cab { display: flex; align-items: center; justify-content: space-between; text-align: center; margin-bottom: 8px; }
-    .cab img { height: 64px; } .cab .b { font-weight: bold; font-size: 12pt; }
+    .cab img { height: 64px; flex-shrink: 0; } .cab > div { min-width: 0; overflow-wrap: anywhere; } .cab .b { font-weight: bold; font-size: 12pt; }
     .cuadro { width: 100%; table-layout: fixed; border-collapse: collapse; border: 3px double #000; text-align: center; font-size: 8pt; }
-    .cuadro th, .cuadro td { border: 1px solid #000; padding: 0; height: 22px; }
-    .cuadro th { font-weight: bold; } .cuadro th.grado { width: 46px; font-size: 10pt; } .cuadro th.campo { font-size: 10pt; }
-    /* Texto vertical con transformación: html2canvas lo captura sin desordenar las letras */
-    .rot { position: relative; }
-    .rot span { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg); transform-origin: center center; white-space: nowrap; font-size: 7pt; line-height: 1; }
-    .temas .rot { height: 110px; } .promret .rot { height: 145px; } .promedio .rot { height: 110px; }
+    .cuadro th, .cuadro td { border: 1px solid #000; padding: 0; height: 22px; overflow: hidden; overflow-wrap: anywhere; word-break: break-word; vertical-align: middle; }
+    .cuadro th { font-weight: bold; } .cuadro th.grado { width: 46px; font-size: 10pt; }
+    .cuadro th.campo { font-size: 8.5pt; height: auto; line-height: 1.1; padding: 2px 3px; }
+    /* Texto vertical con transformación: html2canvas lo captura sin desordenar las letras.
+       El ancho del span equivale a la altura de la celda, así el texto se ajusta y no se sale. */
+    .rot { position: relative; overflow: hidden; }
+    .rot span { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg); transform-origin: center center; white-space: normal; text-align: center; line-height: 1.05; font-size: 7pt; word-break: break-word; }
+    .temas .rot, .promedio .rot { height: 110px; } .promret .rot { height: 145px; }
+    .temas .rot span, .promedio .rot span { width: 104px; } .promret .rot span { width: 138px; }
     .cuadro td.pc, .cuadro tr.tot td { font-weight: bold; } .cuadro tr.tot th, .cuadro tr.tot td { border-top: 3px double #000; }
     .pie { margin: 10px 0 0 40%; font-size: 10pt; } .caja { display: inline-block; min-width: 60px; text-align: center; border: 3px double #000; padding: 1px 6px; }
     .lugar { border: 0; background: transparent; font: inherit; font-weight: bold; width: 320px; margin-top: 6px; }
@@ -1013,6 +1016,7 @@ export class AppComponent {
       const {
         Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
         HeadingLevel, AlignmentType, WidthType, ImageRun, PageOrientation,
+        TableLayoutType, VerticalAlign,
       } = await import('docx');
       const d = (v: any, dec = 0) => {
         if (v === '' || v == null) return '-';
@@ -1022,12 +1026,16 @@ export class AppComponent {
       const celda = (texto: string, op: any = {}) => new TableCell({
         children: [new Paragraph({
           children: [new TextRun({ text: texto, bold: !!op.bold, size: 18 })],
-          alignment: op.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+          alignment: op.center ? AlignmentType.CENTER : AlignmentType.JUSTIFIED,
+          spacing: { before: 20, after: 20, line: 240 },
         })],
         ...(op.ancho ? { width: { size: op.ancho, type: WidthType.PERCENTAGE } } : {}),
+        margins: { top: 60, bottom: 60, left: 90, right: 90 },
+        verticalAlign: VerticalAlign.CENTER,
       });
       const tabla = (cabeceras: string[], filas: string[][], anchos?: number[]) => new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
         rows: [
           new TableRow({ tableHeader: true, children: cabeceras.map((h, j) => celda(h, { bold: true, center: true, ancho: anchos?.[j] })) }),
           ...filas.map(f => new TableRow({ children: f.map((v, j) => celda(v, { center: j > 0, ancho: anchos?.[j] })) })),
@@ -1052,7 +1060,7 @@ export class AppComponent {
 
       const children: any[] = [
         centro('INFORME ESTADÍSTICO', 32),
-        centro('UNIDAD EDUCATIVA "OSCAR ALFARO" · GESTIÓN 2026', 24),
+        centro(`UNIDAD EDUCATIVA "${this.nombreUE()}" · GESTIÓN ${this.gestion()}`, 24),
         centro(`${t}º TRIMESTRE`, 24, 240),
         titulo('1. Resumen general a nivel de Unidad Educativa'),
         tabla(['INDICADOR', 'VALOR'], [

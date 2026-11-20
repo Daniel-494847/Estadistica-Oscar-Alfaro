@@ -14,12 +14,12 @@ function borde(estilo: any, extra: any = {}) {
 }
 
 const S: Record<string, any> = {
-  titulo: { font: { name: FUENTE, sz: 12, bold: true }, alignment: { horizontal: 'center', vertical: 'center' } },
+  titulo: { font: { name: FUENTE, sz: 12, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } },
   grado: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'D9E2F3' } } },
-  grupo: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'BDD7EE' } } },
-  area: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'D9E2F3' } } },
-  col: { font: { name: FUENTE, sz: 8, bold: true }, alignment: { horizontal: 'center', vertical: 'center', textRotation: 90 }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'E2EFDA' } } },
-  totalTit: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'FCE4D6' } } },
+  grupo: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'BDD7EE' } } },
+  area: { font: { name: FUENTE, sz: 8, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'D9E2F3' } } },
+  col: { font: { name: FUENTE, sz: 8, bold: true }, alignment: { horizontal: 'center', vertical: 'center', textRotation: 90, wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'E2EFDA' } } },
+  totalTit: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'FCE4D6' } } },
   celda: { font: { name: FUENTE, sz: 9 }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA },
   porcentaje: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA },
   filaGrado: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'left', vertical: 'center' }, border: REJILLA },
@@ -122,9 +122,16 @@ export class ExportService {
     if (d?.lugar) pie.push(d.lugar);
 
     const anchos = [11, ...cols.map(c => (c.titulo === '%' ? 9 : c.key === 'crit' ? 22 : 13))];
-    const alturas: number[] = titulos.map((_, i) => i === 0 ? 24 : 18);
-    alturas.push(26, sub ? 34 : (tipo === 'promret' ? 140 : 110));
-    if (sub) alturas.push(tipo === 'promret' ? 150 : 120);
+    // Alturas calculadas para que ningún encabezado se salga de su celda.
+    const largoArea = Math.max(0, ...df.campos.flatMap(c => c.areas.map(a => a.nombre.length)));
+    const largoGrupo = Math.max(0, ...df.campos.map(c => c.nombre.length));
+    const altoGrupo = Math.min(56, Math.max(26, Math.ceil(largoGrupo / 38) * 14 + 8));
+    const altoArea = Math.min(72, Math.max(34, Math.ceil(largoArea / 30) * 16 + 10));
+    const altoCols = sub ? (tipo === 'promret' ? 150 : 120)
+      : Math.max(110, Math.ceil(largoArea / 12) * 14 + 20);
+    const alturas: number[] = titulos.map((_, i) => i === 0 ? 26 : 20);
+    alturas.push(altoGrupo, sub ? altoArea : altoCols);
+    if (sub) alturas.push(altoCols);
     for (let i = 0; i < GRADOS.length + 1; i++) alturas.push(19);
     pie.forEach((_, i) => alturas.push(i === pie.length - 1 && d?.lugar ? 20 : 22));
 
