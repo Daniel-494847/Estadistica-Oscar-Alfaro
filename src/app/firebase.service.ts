@@ -14,7 +14,7 @@ const firebaseConfig = {
   measurementId: 'G-72KVSH4HMT',
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 // Analytics es opcional: se inicializa solo cuando hay measurementId y entorno de navegador
 if (typeof window !== 'undefined' && firebaseConfig.measurementId) getAnalytics(app);
 
@@ -34,5 +34,13 @@ export class FirebaseService {
   // Borra un campo concreto sin afectar al resto del grado
   borrarCampoGrado(id: string, grado: string, campo: string) {
     return setDoc(doc(this.db, 'cuadros', id), { datos: { [grado]: { [campo]: deleteField() } }, actualizado: Date.now() }, { merge: true });
+  }
+  // Estado de bloqueo de la edición por trimestre (lo controla el administrador)
+  async leerBloqueos(): Promise<Record<number, boolean>> {
+    const d: any = await this.leer('acceso').catch(() => null);
+    return (d?.bloqueos ?? {}) as Record<number, boolean>;
+  }
+  guardarBloqueos(bloqueos: Record<number, boolean>) {
+    return setDoc(doc(this.db, 'cuadros', 'acceso'), { bloqueos, actualizado: Date.now() }, { merge: true });
   }
 }

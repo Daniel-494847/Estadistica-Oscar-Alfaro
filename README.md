@@ -54,8 +54,27 @@ El icono que se muestra al compartir el enlace está en `src/icono.png` (512×51
   con datos y avisa si el grado actual está vacío.
 - En **Temas Programados**, el valor de **T.PROG. ANUAL** escrito en 1º trimestre se replica
   automáticamente en 2º y 3º trimestre para el mismo grado y área (se guarda en los 3 documentos).
+- En **Promovidos y Retenidos**, **ESTUDIANTES EFECTIVOS** escrito en 1º trimestre se replica en
+  los tres trimestres para el mismo grado, pero **puede modificarse** libremente en 2º y 3º.
 
 > Firestore no requiere crear colecciones manualmente: se crean al escribir el primer documento. Para inicializar o verificar la estructura se usan los scripts de abajo.
+
+## Apartado de administrador
+
+- El acceso está en un botón pequeño **Ingresar administrador** en la parte superior izquierda, visible en todas las vistas. El acceso a los tres cuadros sigue siendo **anónimo** y no requiere iniciar sesión.
+- El administrador entra con **Firebase Auth (correo y contraseña)** y tiene **control total**: puede modificar todos los campos de los tres cuadros, incluido **T.PROG. ANUAL** en 2º y 3º trimestre (para usuarios anónimos, ese casillero es de solo lectura fuera del 1º trimestre).
+- Si el administrador cambia **T.PROG. ANUAL** en cualquier trimestre, el valor se replica automáticamente a los tres documentos.
+- El panel tiene interruptores para **bloquear la edición por trimestre** (1º, 2º, 3º) y botones **Bloquear todo / Desbloquear todo**. El estado se guarda en `cuadros/acceso` y afecta solo a usuarios anónimos: los campos se deshabilitan y el botón **Guardar Registro** deja de estar disponible. El administrador siempre puede editar.
+
+### Alta del usuario (una sola vez, en Firebase Console)
+
+1. Firebase Console → **Authentication** → **Sign-in method** → habilitar **Correo electrónico/Contraseña**.
+2. **Authentication → Users → Add user** → registrar el correo del administrador y su contraseña.
+3. Con esas credenciales ya se puede entrar desde la tarjeta **Administrador**. No existe registro público de usuarios.
+
+> La contraseña **no está en el código**: el bundle de Angular es público y cualquier persona podría leerla. Las credenciales viven solo en Firebase Auth.
+
+> `firestore.rules` actualmente permite lectura y escritura a todos (`if true`), por lo que la restricción de **T.PROG. ANUAL** se aplica en la interfaz. Para exigirla también en el servidor haría falta un *custom claim* de administrador y reglas por campo; dime si quieres que lo añada.
 
 ## Pasos
 
@@ -75,7 +94,7 @@ El PDF se genera con `html2canvas` + `jspdf`; el Excel con `xlsx-js-style` y `ff
 
 ## Gráficos estadísticos
 
-- **Menú → Gráficos Estadísticos**: muestra, agregando los 12 grados a nivel de Unidad Educativa y comparando 1º, 2º y 3º trimestre:
+- **Menú → Gráficos Estadísticos**: muestra, agregando los 12 grados a nivel de Unidad Educativa y comparando 1º, 2º y 3º trimestre. Los cuatro gráficos incluyen una cuarta categoría **PROMEDIO** con la media de los tres trimestres, y los resúmenes de texto también la muestran:
   - **Generales de cada trimestre**: porcentajes de temas avanzados, promovidos y retenidos.
   - **Retenidos y aprobados**: cantidad de estudiantes en cada condición y línea de porcentaje de aprobados/retenidos (eje derecho).
   - **Temas programados y avanzados**: cantidades por trimestre y línea de porcentaje de temas avanzados (eje derecho).
@@ -117,6 +136,7 @@ Los gráficos se generan con `chart.js`, cargado bajo demanda al abrir la secci�
 ## Archivos
 
 - `src/app/config.ts`: áreas, columnas y fórmulas de los 3 cuadros.
+- `src/app/auth.service.ts`: sesión del administrador con Firebase Auth.
 - `src/app/app.component.ts`: menú, formulario por grado, vista previa/impresión, descargas y gráficos estadísticos.
 - `src/app/export.service.ts`: generación del Excel con el formato de la vista previa y impresión en Carta.
 - `src/app/firebase.service.ts`: leer y guardar en Firestore.
@@ -127,6 +147,6 @@ Los gráficos se generan con `chart.js`, cargado bajo demanda al abrir la secci�
 
 ## Seguridad
 
-`firestore.rules` permite leer/escribir únicamente la colección `cuadros` porque la aplicación
-no dispone de inicio de sesión. Si más adelante se añade Firebase Auth, conviene sustituir
-`allow read, write: if true` por una regla que exija `request.auth != null`.
+`firestore.rules` permite leer/escribir la colección `cuadros` sin exigir inicio de sesión: los tres cuadros son anónimos y el apartado de administrador usa Firebase Auth en la interfaz. El bloqueo de edición por trimestre y la restricción de `T.PROG. ANUAL` se aplican en la aplicación, no en el servidor.
+
+Para exigirlo también en Firestore haría falta un *custom claim* de administrador y reglas por campo (además de mover la replicación del anual a un backend autorizado).

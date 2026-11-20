@@ -1,5 +1,6 @@
 import { Component, ViewEncapsulation, computed, signal } from '@angular/core';
 import { FORM_AREAS, GRADOS, TRIMESTRES, Col, Fila, Tipo, calcular, definir, gid, lineas, totales } from './config';
+import { AuthService } from './auth.service';
 import { ExportService } from './export.service';
 import { FirebaseService } from './firebase.service';
 import { IMG } from './imagenes';
@@ -10,6 +11,22 @@ import { IMG } from './imagenes';
   encapsulation: ViewEncapsulation.None, // para que @page y los estilos de impresión funcionen
   template: `
   <div class="container py-3 no-print" [class.app-panel]="vista() !== 'menu'">
+    <!-- Acceso administrador: botón pequeño siempre visible arriba a la izquierda -->
+    <div class="d-flex justify-content-start mb-2 no-print">
+      @if (admin()) {
+        <button class="btn btn-sm btn-outline-success shadow-sm fw-bold" (click)="vista.set('admin')" title="Panel del administrador">
+          <i class="bi bi-shield-check me-1"></i>Administrador
+        </button>
+        <button class="btn btn-sm btn-outline-secondary shadow-sm ms-2" (click)="salirAdmin()" title="Cerrar sesión">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
+      } @else {
+        <button class="btn btn-sm btn-outline-warning shadow-sm fw-bold" (click)="abrirAdmin()" title="Ingresar como administrador">
+          <i class="bi bi-box-arrow-in-right me-1"></i>Ingresar administrador
+        </button>
+      }
+    </div>
+
     <!-- 1. MENÚ PRINCIPAL -->
     @if (vista() === 'menu') {
       <section class="menu-panel">
@@ -61,14 +78,83 @@ import { IMG } from './imagenes';
       </section>
     }
 
+    <!-- 1b. ADMINISTRADOR: acceso con Firebase Auth, control total -->
+    @if (vista() === 'admin') {
+      <section class="app-panel">
+        <div class="row g-2 align-items-center mb-3">
+          <div class="col-12 col-sm-auto">
+            <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="vista.set('menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
+          </div>
+          <div class="col-12 col-sm"><h2 class="h4 mb-0 text-center text-sm-start">Apartado de Administrador</h2></div>
+        </div>
+
+        @if (!admin()) {
+          <div class="card card-body mx-auto" style="max-width: 420px">
+            <div class="text-center fs-1 text-warning mb-2"><i class="bi bi-shield-lock-fill"></i></div>
+            <h3 class="h5 text-center mb-3">Iniciar sesión</h3>
+            <label class="form-label small fw-bold">Correo electrónico</label>
+            <input type="email" class="form-control mb-2" [value]="correo()" (input)="correo.set($any($event.target).value)" placeholder="admin@correo.com">
+            <label class="form-label small fw-bold">Contraseña</label>
+            <input type="password" class="form-control mb-3" [value]="clave()" (input)="clave.set($any($event.target).value)" (keyup.enter)="ingresar()" placeholder="Contraseña">
+            @if (auth.error()) { <div class="alert alert-danger small py-2">{{ auth.error() }}</div> }
+            <button class="btn btn-warning w-100 fw-bold" (click)="ingresar()" [disabled]="auth.cargando()">
+              <i class="bi bi-box-arrow-in-right me-2"></i>{{ auth.cargando() ? 'Verificando...' : 'Entrar como administrador' }}
+            </button>
+          </div>
+        } @else {
+          <div class="card card-body mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <div>
+                <h3 class="h5 mb-1"><i class="bi bi-shield-check text-success me-2"></i>Control total activado</h3>
+                <div class="small text-muted">Sesión: {{ auth.usuario()?.email }}</div>
+              </div>
+              <button class="btn btn-outline-danger btn-sm" (click)="salirAdmin()"><i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión</button>
+            </div>
+            <div class="alert alert-info small py-2 mt-3 mb-0">
+              Como administrador puede modificar todos los campos de los tres cuadros, incluido <b>T.PROG. ANUAL</b> en cualquier trimestre.
+            </div>
+          </div>
+          <div class="card card-body mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <h3 class="h6 mb-0"><i class="bi bi-lock-fill me-2"></i>Bloquear edición por trimestre</h3>
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-danger" (click)="bloquearTodo(true)">Bloquear todo</button>
+                <button class="btn btn-sm btn-outline-success" (click)="bloquearTodo(false)">Desbloquear todo</button>
+              </div>
+            </div>
+            <div class="row g-2 mt-2">
+              @for (t of trimestres; track t) {
+                <div class="col-12 col-sm-4">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="bloq{{ t }}" [checked]="bloqueos()[t]" (change)="cambiarBloqueo(t, $any($event.target).checked)">
+                    <label class="form-check-label small" for="bloq{{ t }}">{{ t }}º trimestre · {{ bloqueos()[t] ? 'bloqueado' : 'editable' }}</label>
+                  </div>
+                </div>
+              }
+            </div>
+            <div class="small text-muted mt-2">{{ bloqueoMsg() || 'El bloqueo afecta a los usuarios anónimos. El administrador siempre puede editar.' }}</div>
+          </div>
+          <div class="row g-3">
+            @for (o of tipos; track o[0]) {
+              <div class="col-md-4"><button class="btn menu-card w-100 p-4 text-start h-100" (click)="abrir(o[0])">
+                <div class="fs-1 text-primary"><i class="bi {{ o[3] }}"></i></div><div class="fw-bold fs-5">{{ o[1] }}</div><div class="small">Editar con control total.</div>
+              </button></div>
+            }
+          </div>
+        }
+      </section>
+    }
+
     <!-- 2. FORMULARIO POR GRADO -->
     @if (vista() === 'form') {
       <div class="row g-2 align-items-center mb-3">
         <div class="col-12 col-sm-auto order-2 order-sm-1">
-          <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="vista.set('menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
+          <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="vista.set(admin() ? 'admin' : 'menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
         </div>
         <div class="col-12 col-sm order-1 order-sm-2">
-          <h2 class="h4 mb-0 text-center text-sm-start">{{ nombreTipo() }}</h2>
+          <h2 class="h4 mb-0 text-center text-sm-start">{{ nombreTipo() }}
+            @if (admin()) { <span class="badge text-bg-warning ms-2">Administrador</span> }
+          </h2>
         </div>
       </div>
       <div class="card card-body mb-3"><div class="row g-2 g-md-3 align-items-end">
@@ -85,14 +171,26 @@ import { IMG } from './imagenes';
         <div class="col-12 col-md-4"><button class="btn btn-primary w-100" (click)="cargar()">⟳ Cargar Datos</button></div>
       </div></div>
 
+      @if (!admin() && tipo() === 'temas' && trim() !== 1) {
+        <div class="alert alert-info small py-2 mb-3">
+          El casillero <b>T.PROG. ANUAL</b> solo se registra en el <b>1º trimestre</b> y se aplica automáticamente a los tres trimestres. Para modificarlo, edítalo en el 1º trimestre.
+        </div>
+      }
+      @if (trimBloqueado()) {
+        <div class="alert alert-warning small py-2 mb-3">
+          <i class="bi bi-lock-fill me-1"></i>La edición del {{ trim() }}º trimestre está bloqueada por el administrador. Solo puede consultar los datos.
+        </div>
+      }
+
       @if (tipo() === 'promret') {
         <div class="row g-2 g-md-3 mb-3">
           <div class="col-12 col-md-4"><div class="card card-body bg-primary text-white"><small class="fw-bold">ESTUDIANTES EFECTIVOS</small>
-            <input type="number" class="form-control" [value]="cur()['efec'] ?? ''" (input)="set('efec', $any($event.target).value)" (wheel)="bloquearScroll($event)"></div></div>
+            <input type="number" class="form-control" [value]="cur()['efec'] ?? ''" [disabled]="trimBloqueado()" (input)="set('efec', $any($event.target).value)" (wheel)="bloquearScroll($event)">
+            <small class="d-block mt-1 text-white-50" style="font-size:.7rem">Se aplica a los 3 trimestres; editable en cada uno.</small></div></div>
           <div class="col-12 col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">TOTAL PROMOVIDOS</small>
-            <input type="number" class="form-control" [class.is-invalid]="bad(totCol())" [value]="cur()['t_prom'] ?? ''" (input)="set('t_prom', $any($event.target).value)" (wheel)="bloquearScroll($event)"></div></div>
+            <input type="number" class="form-control" [class.is-invalid]="bad(totCol())" [value]="cur()['t_prom'] ?? ''" [disabled]="trimBloqueado()" (input)="set('t_prom', $any($event.target).value)" (wheel)="bloquearScroll($event)"></div></div>
           <div class="col-12 col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">TOTAL RETENIDOS</small>
-            <input type="number" class="form-control" [class.is-invalid]="bad(totRetCol())" [value]="cur()['t_ret'] ?? ''" (input)="set('t_ret', $any($event.target).value)" (wheel)="bloquearScroll($event)">
+            <input type="number" class="form-control" [class.is-invalid]="bad(totRetCol())" [value]="cur()['t_ret'] ?? ''" [disabled]="trimBloqueado()" (input)="set('t_ret', $any($event.target).value)" (wheel)="bloquearScroll($event)">
           </div></div>
         </div>
       }
@@ -108,7 +206,7 @@ import { IMG } from './imagenes';
               @for (c of colsDe(a[0]); track c.key) {
                 <td [class.fw-bold]="!c.entrada">
                   @if (c.entrada) {
-                    <input type="number" class="form-control form-control-sm text-center" [class.is-invalid]="bad(c)" [value]="cur()[c.key] ?? ''" (input)="set(c.key, $any($event.target).value)" (wheel)="bloquearScroll($event)">
+                    <input type="number" class="form-control form-control-sm text-center" [class.is-invalid]="bad(c)" [value]="cur()[c.key] ?? ''" [disabled]="trimBloqueado()" (input)="set(c.key, $any($event.target).value)" (wheel)="bloquearScroll($event)">
                   } @else { {{ fila()[c.key] }} }
                 </td>
               }
@@ -121,13 +219,13 @@ import { IMG } from './imagenes';
         <div class="row g-2 g-md-3 mb-3">
           <div class="col-12 col-md-6"><div class="card card-body"><small class="fw-bold text-secondary">PROMEDIO DE GRADO (automático)</small><div class="fs-4 fw-bold">{{ fila()['prom'] }}</div></div></div>
           <div class="col-12 col-md-6"><label class="form-label small fw-bold">Criterio de evaluación</label>
-            <input class="form-control" [value]="cur()['crit'] ?? ''" (input)="set('crit', $any($event.target).value)"></div>
+            <input class="form-control" [value]="cur()['crit'] ?? ''" [disabled]="trimBloqueado()" (input)="set('crit', $any($event.target).value)"></div>
         </div>
       }
 
       <div class="d-grid gap-2 d-sm-flex flex-sm-wrap align-items-sm-center mt-3">
         <button class="btn btn-primary" (click)="pdfPreparado.set(false); vista.set('previa')">🖨 Vista Previa e Imprimir</button>
-        <button class="btn btn-success" (click)="guardar()">💾 Guardar Registro</button>
+        <button class="btn btn-success" (click)="guardar()" [disabled]="trimBloqueado()">💾 Guardar Registro</button>
         <span class="small text-muted text-center text-sm-start w-100">{{ cargando() ? 'Procesando...' : msg() }}</span>
       </div>
 
@@ -223,19 +321,19 @@ import { IMG } from './imagenes';
       </div>
       <div class="row g-4">
         <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Generales de cada trimestre</div>
+          <div class="card-header fw-bold">Generales por trimestre y promedio</div>
           <div class="card-body py-2"><div style="height:275px"><canvas id="grafGeneral"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenGeneral() }}</div></div>
         </div></div>
         <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Retenidos y aprobados</div>
+          <div class="card-header fw-bold">Retenidos y aprobados + promedio</div>
           <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromRet"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromRet() }}</div></div>
         </div></div>
         <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Temas programados y avanzados</div>
+          <div class="card-header fw-bold">Temas programados y avanzados + promedio</div>
           <div class="card-body py-2"><div style="height:275px"><canvas id="grafTemas"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenTemas() }}</div></div>
         </div></div>
         <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Promedios</div>
+          <div class="card-header fw-bold">Promedios + promedio de los 3 trimestres</div>
           <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromedios"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromedio() }}</div></div>
         </div></div>
       </div>
@@ -325,7 +423,7 @@ export class AppComponent {
     ['promret', 'Promovidos y Retenidos', 'Control de estudiantes promovidos y retenidos.', 'bi-person-check-fill'],
   ];
 
-  vista = signal<'menu' | 'form' | 'previa' | 'graficos'>('menu');
+  vista = signal<'menu' | 'form' | 'previa' | 'graficos' | 'admin'>('menu');
   charts: any[] = [];
   tipo = signal<Tipo>('temas');
   trim = signal(1); // 1º, 2º y 3º trimestre disponibles
@@ -336,12 +434,17 @@ export class AppComponent {
   msg = signal(''); cargando = signal(false); guardado = signal(false);
   informeTrim = signal(1); generandoInforme = signal(false); informeMsg = signal('');
   pdfTipo = signal<Tipo>('temas'); pdfTrim = signal(0); pdfPreparado = signal(false); // 0 = todos los trimestres
+  correo = signal(''); clave = signal(''); // formulario de acceso administrador
+  admin = computed(() => this.auth.esAdmin);
+  bloqueos = signal<Record<number, boolean>>({}); // edición bloqueada por trimestre
+  bloqueoMsg = signal('');
+  trimBloqueado = computed(() => !this.admin() && !!this.bloqueos()[this.trim()]);
   resumenGeneral = signal(''); resumenPromRet = signal(''); resumenTemas = signal(''); resumenPromedio = signal('');
   agregados: any = null;
   private replicarTimers = new Map<string, any>();
 
   // Todo lo que se ve se calcula solo a partir de lo escrito
-  def = computed(() => definir(this.tipo(), this.trim()));
+  def = computed(() => definir(this.tipo(), this.trim(), this.admin()));
   sub = computed(() => this.def().nArea > 1);
   todas = computed(() => [...this.def().cols, ...this.def().total]);
   filas = computed(() => this.grados.map(g => calcular(this.todas(), this.datos()[gid(g)] ?? {})));
@@ -361,7 +464,9 @@ export class AppComponent {
     c.entrada && c.key !== 't_ret' ? (this.datos()[gid(g)]?.[c.key] ?? '') : this.filas()[i][c.key];
   bad = (c: Col) => !!c.ok && !c.ok(this.fila());
 
-  constructor(private fb: FirebaseService, private exp: ExportService) {}
+  constructor(private fb: FirebaseService, private exp: ExportService, public auth: AuthService) {
+    this.cargarBloqueos();
+  }
 
   // Un grado tiene datos si alguna de sus celdas tiene valor (los grados sembrados están vacíos)
   conDatos(datos: Record<string, Fila | undefined>, g: string) {
@@ -369,7 +474,34 @@ export class AppComponent {
     return !!f && Object.values(f).some(v => v !== '' && v != null);
   }
 
-  abrir(t: Tipo) { this.pdfPreparado.set(false); this.tipo.set(t); this.trim.set(1); this.guardado.set(false); this.vista.set('form'); this.cargar(true); }
+  abrir(t: Tipo) { this.pdfPreparado.set(false); this.tipo.set(t); this.trim.set(1); this.guardado.set(false); this.vista.set('form'); this.cargar(true); this.cargarBloqueos(); }
+
+  abrirAdmin() { this.correo.set(''); this.clave.set(''); this.auth.error.set(''); this.vista.set('admin'); }
+  async ingresar() { await this.auth.ingresar(this.correo(), this.clave()); }
+  async salirAdmin() { await this.auth.salir(); }
+
+  async cargarBloqueos() {
+    try { this.bloqueos.set(await this.fb.leerBloqueos()); } catch { /* sin conexión: se permite editar */ }
+  }
+  async cambiarBloqueo(t: number, v: boolean) {
+    this.bloqueos.update(b => ({ ...b, [t]: v }));
+    await this.guardarBloqueos();
+  }
+  async bloquearTodo(v: boolean) {
+    const b: Record<number, boolean> = {};
+    TRIMESTRES.forEach(t => { b[t] = v; });
+    this.bloqueos.set(b);
+    await this.guardarBloqueos();
+  }
+  private async guardarBloqueos() {
+    this.bloqueoMsg.set('Guardando...');
+    try {
+      await this.fb.guardarBloqueos(this.bloqueos());
+      this.bloqueoMsg.set('Estado de bloqueo guardado.');
+    } catch {
+      this.bloqueoMsg.set('No se pudo guardar el estado de bloqueo.');
+    }
+  }
 
   salir() { this.charts.forEach(c => c.destroy()); this.charts = []; this.pdfPreparado.set(false); this.vista.set('menu'); }
 
@@ -409,20 +541,33 @@ export class AppComponent {
       this.agregados = await this.obtenerAgregados();
       const { temas, promret, promedio }: { temas: Fila[]; promret: Fila[]; promedio: number[]; filas: any[] } = this.agregados;
       const num = (v: any) => +(String(v ?? '').replace('%', '')) || 0;
-      const pct = (v: any) => `${Math.round(num(v))}%`;
-      const etiquetas = TRIMESTRES.map(t => `${t}º TRIM`);
-      const porTrim = (fn: (i: number) => string) => TRIMESTRES.map((t, i) => `${t}º TRIMESTRE\n${fn(i)}`).join('\n\n');
+      // Cada serie lleva un cuarto valor: la media de los tres trimestres.
+      const media = (v: number[]) => v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(2) : 0;
+      const conMedia = (v: number[]) => [...v, media(v)];
+      const tpct = conMedia(temas.map(x => num(x['t_pct'])));
+      const tprog = conMedia(temas.map(x => num(x['t_prog'])));
+      const tavanz = conMedia(temas.map(x => num(x['t_avanz'])));
+      const pp = conMedia(promret.map(x => num(x['t_pp'])));
+      const pr = conMedia(promret.map(x => num(x['t_pr'])));
+      const paprob = conMedia(promret.map(x => num(x['t_prom'])));
+      const pret = conMedia(promret.map(x => num(x['t_ret'])));
+      const pro = conMedia(promedio.map(x => Number(x)));
+      const etiquetas = [...TRIMESTRES.map(t => `${t}º TRIM`), 'PROMEDIO'];
+      const porTrim = (fn: (i: number) => string) => [
+        ...TRIMESTRES.map((t, i) => `${t}º TRIMESTRE\n${fn(i)}`),
+        `PROMEDIO 3 TRIMESTRES\n${fn(3)}`,
+      ].join('\n\n');
       this.resumenGeneral.set(porTrim(i => [
-        `Temas Avanzados ${pct(temas[i]['t_pct'])}`,
-        `Promovidos ${pct(promret[i]['t_pp'])}`,
-        `Retenidos ${pct(promret[i]['t_pr'])}`,
+        `Temas Avanzados ${Math.round(tpct[i])}%`,
+        `Promovidos ${Math.round(pp[i])}%`,
+        `Retenidos ${Math.round(pr[i])}%`,
       ].join('\n')));
       this.resumenPromRet.set(porTrim(i => [
-        `Aprobados ${pct(promret[i]['t_pp'])}`,
-        `Retenidos ${pct(promret[i]['t_pr'])}`,
+        `Aprobados ${Math.round(pp[i])}%`,
+        `Retenidos ${Math.round(pr[i])}%`,
       ].join('\n')));
-      this.resumenTemas.set(porTrim(i => `Avanzados ${pct(temas[i]['t_pct'])}`));
-      this.resumenPromedio.set(porTrim(i => `Promedio ${Number(promedio[i]).toFixed(2)}`));
+      this.resumenTemas.set(porTrim(i => `Avanzados ${Math.round(tpct[i])}%`));
+      this.resumenPromedio.set(porTrim(i => `Promedio ${pro[i].toFixed(2)}`));
 
       const { Chart, registerables } = await import('chart.js');
       Chart.register(...registerables);
@@ -467,9 +612,9 @@ export class AppComponent {
         type: 'bar',
         plugins: [etiquetasValores(v => `${Math.round(v)}%`)],
         data: { labels: etiquetas, datasets: [
-          { label: '% Temas avanzados', data: temas.map(x => num(x['t_pct'])), backgroundColor: '#0d6efd' },
-          { label: '% Promovidos', data: promret.map(x => num(x['t_pp'])), backgroundColor: '#198754' },
-          { label: '% Retenidos', data: promret.map(x => num(x['t_pr'])), backgroundColor: '#dc3545' },
+          { label: '% Temas avanzados', data: tpct, backgroundColor: '#0d6efd' },
+          { label: '% Promovidos', data: pp, backgroundColor: '#198754' },
+          { label: '% Retenidos', data: pr, backgroundColor: '#dc3545' },
         ] }, options: opciones(100),
       });
       crear('grafPromRet', {
@@ -477,32 +622,32 @@ export class AppComponent {
         plugins: [etiquetasValores((v, ds, di, i) => {
           // El porcentaje ya va en la barra: no se repite sobre la línea.
           if (ds.yAxisID === 'y1') return '';
-          const porc = di === 0 ? promret[i]['t_pp'] : promret[i]['t_pr'];
-          return `${Math.round(v)} (${Math.round(num(porc))}%)`;
+          const porc = di === 0 ? pp[i] : pr[i];
+          return `${Math.round(v)} (${Math.round(porc)}%)`;
         })],
         data: { labels: etiquetas, datasets: [
-          { label: 'Aprobados', data: promret.map(x => num(x['t_prom'])), backgroundColor: '#198754', yAxisID: 'y' },
-          { label: 'Retenidos', data: promret.map(x => num(x['t_ret'])), backgroundColor: '#dc3545', yAxisID: 'y' },
-          { type: 'line', label: '% Aprobados', data: promret.map(x => num(x['t_pp'])), borderColor: '#146c43', backgroundColor: '#146c43', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
-          { type: 'line', label: '% Retenidos', data: promret.map(x => num(x['t_pr'])), borderColor: '#b02a37', backgroundColor: '#b02a37', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
+          { label: 'Aprobados', data: paprob, backgroundColor: '#198754', yAxisID: 'y' },
+          { label: 'Retenidos', data: pret, backgroundColor: '#dc3545', yAxisID: 'y' },
+          { type: 'line', label: '% Aprobados', data: pp, borderColor: '#146c43', backgroundColor: '#146c43', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
+          { type: 'line', label: '% Retenidos', data: pr, borderColor: '#b02a37', backgroundColor: '#b02a37', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
         ] }, options: opciones(undefined, true),
       });
       crear('grafTemas', {
         type: 'bar',
         plugins: [etiquetasValores((v, ds, _di, i) => ds.yAxisID === 'y1'
           ? ''
-          : `${Math.round(v)} (${Math.round(num(temas[i]['t_pct']))}%)`)],
+          : `${Math.round(v)} (${Math.round(tpct[i])}%)`)],
         data: { labels: etiquetas, datasets: [
-          { label: 'Programados', data: temas.map(x => num(x['t_prog'])), backgroundColor: '#0d6efd', yAxisID: 'y' },
-          { label: 'Avanzados', data: temas.map(x => num(x['t_avanz'])), backgroundColor: '#6610f2', yAxisID: 'y' },
-          { type: 'line', label: '% Avanzados', data: temas.map(x => num(x['t_pct'])), borderColor: '#3a0ca3', backgroundColor: '#3a0ca3', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
+          { label: 'Programados', data: tprog, backgroundColor: '#0d6efd', yAxisID: 'y' },
+          { label: 'Avanzados', data: tavanz, backgroundColor: '#6610f2', yAxisID: 'y' },
+          { type: 'line', label: '% Avanzados', data: tpct, borderColor: '#3a0ca3', backgroundColor: '#3a0ca3', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
         ] }, options: opciones(undefined, true),
       });
       crear('grafPromedios', {
         type: 'line',
         plugins: [etiquetasValores(v => v.toFixed(2))],
         data: { labels: etiquetas, datasets: [
-          { label: 'Promedio general', data: promedio, borderColor: '#fd7e14', backgroundColor: '#fd7e14', tension: 0.3, pointRadius: 5 },
+          { label: 'Promedio general', data: pro, borderColor: '#fd7e14', backgroundColor: '#fd7e14', tension: 0.3, pointRadius: 5 },
         ] }, options: opciones(100),
       });
       this.msg.set('');
@@ -623,33 +768,42 @@ export class AppComponent {
 
   cambiarTrim(t: string) { this.trim.set(+t); this.cargar(true); }
   set(key: string, v: string) {
+    if (this.trimBloqueado()) return;
+    // El T.PROG. ANUAL es de solo lectura en 2º y 3º para usuarios anónimos;
+    // el administrador puede editarlo en cualquier trimestre.
+    if (!this.admin() && this.tipo() === 'temas' && this.trim() !== 1 && key.endsWith('_anual')) return;
     const g = gid(this.grado());
     this.datos.update(d => ({ ...d, [g]: { ...d[g], [key]: v } }));
     this.guardado.set(false);
-    // En Temas Programados, el T.PROG. ANUAL se escribe una vez en 1º trimestre
-    // y se replica automáticamente en 2º y 3º para el mismo grado y área.
-    if (this.tipo() === 'temas' && this.trim() === 1 && key.endsWith('_anual')) {
-      this.replicarAnual(g, key, v);
-    }
+    // Campos que se escriben en 1º trimestre y se replican a los tres:
+    // - T.PROG. ANUAL: solo se edita en 1º (salvo el administrador).
+    // - ESTUDIANTES EFECTIVOS: se replica, pero se puede modificar en 2º y 3º.
+    const replicaAnual = this.tipo() === 'temas' && key.endsWith('_anual') && (this.trim() === 1 || this.admin());
+    const replicaEfec = this.tipo() === 'promret' && key === 'efec' && this.trim() === 1;
+    if (replicaAnual || replicaEfec) this.replicarEnTrimestres(g, key, v);
   }
 
-  private replicarAnual(g: string, key: string, v: string) {
-    const k = `${g}_${key}`;
+  private replicarEnTrimestres(g: string, key: string, v: string) {
+    const esEfec = key === 'efec';
+    const prefijo = esEfec ? 'promret' : 'temas';
+    const etiqueta = esEfec ? 'ESTUDIANTES EFECTIVOS' : 'T.PROG. ANUAL';
+    const k = `${prefijo}_${g}_${key}`;
     clearTimeout(this.replicarTimers.get(k));
     this.replicarTimers.set(k, setTimeout(async () => {
       try {
-        for (const id of ['temas_1', 'temas_2', 'temas_3']) {
+        for (const t of TRIMESTRES) {
+          const id = `${prefijo}_${t}`;
           const doc = await this.fb.leer(id);
           const grado = doc?.['datos']?.[g];
           if (v === '') {
-            // Si el usuario limpia el anual, se quita el campo donde exista; no se crea un grado vacío.
+            // Si se limpia el valor, se quita el campo donde exista; no se crea un grado vacío.
             if (grado) await this.fb.borrarCampoGrado(id, g, key);
           } else {
             await this.fb.guardarGrado(id, g, { ...(grado ?? {}), [key]: v }, {});
           }
         }
-        this.msg.set('T.PROG. ANUAL replicado en los tres trimestres');
-      } catch (e) { console.error(e); this.msg.set('No se pudo replicar el T.PROG. ANUAL'); }
+        this.msg.set(`${etiqueta} replicado en los tres trimestres`);
+      } catch (e) { console.error(e); this.msg.set(`No se pudo replicar ${etiqueta}`); }
     }, 400));
   }
   // Evita que la rueda del ratón cambie el valor de los campos numéricos
@@ -681,9 +835,15 @@ export class AppComponent {
     this.cargando.set(false);
   }
   async guardar() {
+    if (this.trimBloqueado()) { this.msg.set('La edición de este trimestre está bloqueada por el administrador'); return; }
     this.cargando.set(true);
     try {
-      await this.fb.guardarGrado(this.id(), gid(this.grado()), this.cur(), { gestion: this.gestion(), lugar: this.lugar() });
+      // En 2º y 3º no se guarda el anual: la fuente de verdad es el 1º trimestre
+      // y escribirlo aquí podría sobrescribir el valor replicado con uno desactualizado.
+      const fila = !this.admin() && this.tipo() === 'temas' && this.trim() !== 1
+        ? Object.fromEntries(Object.entries(this.cur()).filter(([k]) => !k.endsWith('_anual')))
+        : this.cur();
+      await this.fb.guardarGrado(this.id(), gid(this.grado()), fila, { gestion: this.gestion(), lugar: this.lugar() });
       this.guardado.set(true);
     } catch { this.msg.set('No se pudo guardar (revisa la configuración de Firebase)'); }
     this.cargando.set(false);

@@ -2,7 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // La app no tiene inicio de sesión: se permite leer/escribir solo la colección `cuadros`.
+    // Acceso anónimo a los cuadros; el apartado de administrador usa Firebase Auth en la app.
     match /cuadros/{cuadro} {
       allow read, write: if true;
     }

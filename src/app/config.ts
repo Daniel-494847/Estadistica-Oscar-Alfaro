@@ -36,7 +36,7 @@ const n = (v: any) => (v === '' || v == null ? 0 : +v);
 const vacio = (v: any) => v === '' || v == null;
 const pct = (a: any, b: any, k: number) => (n(b) > 0 ? Math.round((n(a) / n(b)) * k) + '%' : '');
 
-export function definir(tipo: Tipo, t: number) {
+export function definir(tipo: Tipo, t: number, admin = false) {
   const k = t === 2 ? 34 : 33; // peso del trimestre (33+34+33 = 100)
   const campos = CAMPOS.map(([nombre, ids]) => ({
     nombre,
@@ -50,7 +50,9 @@ export function definir(tipo: Tipo, t: number) {
 
   if (tipo === 'temas') {
     porArea = id => [
-      { key: id + '_anual', titulo: 'T.PROG. ANUAL', entrada: true, tot: 'sum', ok: m => n(m[id + '_prog']) <= n(m[id + '_anual']) },
+      // T.PROG. ANUAL: en 2º y 3º es de solo lectura para usuarios anónimos;
+      // el administrador puede editarlo en cualquier trimestre (control total).
+      { key: id + '_anual', titulo: 'T.PROG. ANUAL', entrada: t === 1 || admin, tot: 'sum', ok: m => n(m[id + '_prog']) <= n(m[id + '_anual']) },
       { key: id + '_prog', titulo: `T.PROG. ${t}º TRIMESTRE`, entrada: true, tot: 'sum', ok: m => n(m[id + '_prog']) <= n(m[id + '_anual']) },
       { key: id + '_avanz', titulo: `T.AVANZ. ${t}º TRIMESTRE`, entrada: true, tot: 'sum', ok: m => n(m[id + '_avanz']) <= n(m[id + '_prog']) },
       { key: id + '_pct', titulo: '%', tot: 'self', calc: m => pct(m[id + '_avanz'], m[id + '_prog'], k) },
