@@ -129,9 +129,30 @@ import { IMG } from './imagenes';
               <button class="btn btn-outline-danger btn-sm" (click)="salirAdmin()"><i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión</button>
             </div>
             <div class="alert alert-info small py-2 mt-3 mb-0">
-              Como administrador puede modificar todos los campos de los tres cuadros, incluido <b>T.PROG. ANUAL</b> en cualquier trimestre.
+              Como administrador puede modificar todos los campos de los tres cuadros de <b>{{ nombreUE() }}</b>, incluido <b>T.PROG. ANUAL</b> en cualquier trimestre.
             </div>
           </div>
+          <div class="card card-body mb-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <div class="d-flex align-items-center gap-3">
+                <img [src]="escudoUE()" alt="Escudo" style="height:56px;width:56px;object-fit:contain" class="border rounded bg-white p-1">
+                <div>
+                  <div class="small text-muted">Unidad educativa activa</div>
+                  <div class="h5 mb-0 fw-bold text-uppercase">{{ nombreUE() }}</div>
+                  <div class="small text-muted">{{ coleccion() }}</div>
+                </div>
+              </div>
+              <button class="btn btn-sm btn-outline-primary" (click)="copiarLink()"><i class="bi bi-link-45deg me-1"></i>Copiar enlace de esta U.E.</button>
+            </div>
+          </div>
+          <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><button class="nav-link" [class.active]="adminSeccion() === 'unidades'" (click)="adminSeccion.set('unidades')"><i class="bi bi-building me-1"></i>Unidades educativas</button></li>
+            <li class="nav-item"><button class="nav-link" [class.active]="adminSeccion() === 'configuracion'" (click)="adminSeccion.set('configuracion')"><i class="bi bi-sliders me-1"></i>Configuración</button></li>
+            <li class="nav-item"><button class="nav-link" [class.active]="adminSeccion() === 'areas'" (click)="adminSeccion.set('areas')"><i class="bi bi-journal-bookmark me-1"></i>Áreas</button></li>
+            <li class="nav-item"><button class="nav-link" [class.active]="adminSeccion() === 'cuadros'" (click)="adminSeccion.set('cuadros')"><i class="bi bi-table me-1"></i>Cuadros</button></li>
+          </ul>
+
+          @if (adminSeccion() === 'unidades') {
           <div class="card card-body mb-3">
             <h3 class="h6 mb-3"><i class="bi bi-building me-2"></i>Unidades educativas</h3>
             <div class="small mb-2">
@@ -168,8 +189,11 @@ import { IMG } from './imagenes';
               <span class="small text-muted w-100">{{ importMsg() }}</span>
             </div>
           </div>
+          }
+
+          @if (adminSeccion() === 'areas') {
           <div class="card card-body mb-3">
-            <h3 class="h6 mb-3"><i class="bi bi-journal-bookmark me-2"></i>Áreas de aprendizaje · {{ nombreUE() }}</h3>
+            <h3 class="h6 mb-3"><i class="bi bi-journal-bookmark me-2"></i>Áreas de aprendizaje de {{ nombreUE() }}</h3>
             <div class="d-flex flex-wrap gap-2 mb-3">
               @for (a of areasCfg(); track a.id) {
                 <span class="badge text-bg-light border d-inline-flex align-items-center gap-1">
@@ -187,9 +211,13 @@ import { IMG } from './imagenes';
                 </select></div>
               <div class="col-12 col-md-2"><button class="btn btn-success w-100" (click)="agregarArea()">Añadir</button></div>
             </div>
-            <div class="small text-muted mt-2">{{ areasMsg() || 'Los cambios se aplican a los tres cuadros, gráficos y Excel de esta unidad educativa.' }}</div>
+            <div class="small text-muted mt-2">{{ areasMsg() || 'Los cambios en esta sección afectan solo a ' + nombreUE() + ': tres cuadros, gráficos y Excel.' }}</div>
           </div>
+          }
+
+          @if (adminSeccion() === 'configuracion') {
           <div class="card card-body mb-3">
+            <h3 class="h6 mb-3"><i class="bi bi-sliders me-2"></i>Configuración de {{ nombreUE() }}</h3>
             <div class="row g-2 align-items-center">
               <div class="col-12 col-sm-auto"><label for="trimPref" class="fw-bold mb-0"><i class="bi bi-calendar2-week me-2"></i>Trimestre preferido al abrir formularios</label></div>
               <div class="col-12 col-sm-4">
@@ -218,8 +246,12 @@ import { IMG } from './imagenes';
                 </div>
               }
             </div>
-            <div class="small text-muted mt-2">{{ bloqueoMsg() || 'El bloqueo afecta a los usuarios anónimos. El administrador siempre puede editar.' }}</div>
+            <div class="small text-muted mt-2">{{ bloqueoMsg() || 'El bloqueo afecta a los usuarios anónimos de ' + nombreUE() + '. El administrador siempre puede editar.' }}</div>
           </div>
+          }
+
+          @if (adminSeccion() === 'cuadros') {
+          <h3 class="h6 mb-3"><i class="bi bi-table me-2"></i>Cuadros de {{ nombreUE() }} · edición con control total</h3>
           <div class="row g-3">
             @for (o of tipos; track o[0]) {
               <div class="col-md-4"><button class="btn menu-card w-100 p-4 text-start h-100" (click)="abrir(o[0])">
@@ -227,6 +259,7 @@ import { IMG } from './imagenes';
               </button></div>
             }
           </div>
+          }
         }
       </section>
     }
@@ -532,6 +565,7 @@ export class AppComponent {
   coleccion = signal(COLECCION_DEFECTO);
   nombreUE = computed(() => this.colegios()[this.slugActual()]?.nombre ?? 'OSCAR ALFARO');
   linkColegio = computed(() => this.linkPara(this.slugActual()));
+  adminSeccion = signal<'unidades' | 'configuracion' | 'areas' | 'cuadros'>('unidades');
   nuevaUE = signal(''); colegiosMsg = signal(''); escudoNuevo = signal(''); importMsg = signal('');
   escudoUE = computed(() => this.colegios()[this.slugActual()]?.escudo || IMG.escudo);
   trimBloqueado = computed(() => !this.admin() && !!this.bloqueos()[this.trim()]);
@@ -670,9 +704,10 @@ export class AppComponent {
       this.nuevaUE.set(''); this.escudoNuevo.set('');
       this.colegiosMsg.set(`Creada. Enlace: ${this.linkPara(slug)}`);
       await this.cambiarColegio(slug);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      this.colegiosMsg.set('No se pudo crear la unidad educativa.');
+      const detalle = e?.code === 'permission-denied' ? 'permisos de Firestore' : (e?.message ?? String(e));
+      this.colegiosMsg.set(`No se pudo crear la unidad educativa: ${detalle}`);
     }
   }
 

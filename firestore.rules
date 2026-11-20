@@ -10,7 +10,7 @@ service cloud.firestore {
     // Cada unidad educativa nueva tiene su propia colección (cuadros_<slug>).
     // El registro de unidades y sus escudos vive en config/colegios.
     match /{coleccion}/{documento} {
-      allow read, write: if coleccion == 'config' || coleccion.matches('^cuadros_');
+      allow read, write: if coleccion == 'config' || coleccion.matches('cuadros_.*');
     }
 
     // Todo lo demás queda bloqueado por defecto.
