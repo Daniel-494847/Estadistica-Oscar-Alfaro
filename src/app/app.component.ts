@@ -229,6 +229,20 @@ import { IMG } from './imagenes';
             </div>
           </div>
           <div class="card card-body mb-3">
+            <h3 class="h6 mb-3"><i class="bi bi-image me-2"></i>Escudo identificativo de {{ nombreUE() }}</h3>
+            <div class="d-flex flex-wrap align-items-center gap-3">
+              <img [src]="escudoEdicion() || escudoUE()" alt="Escudo" style="height:72px;width:72px;object-fit:contain" class="border rounded bg-white p-1">
+              <div class="flex-grow-1" style="min-width: 220px">
+                <input class="form-control form-control-sm mb-2" type="file" accept="image/*" (change)="elegirEscudoUE($event)">
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-sm btn-primary" (click)="guardarEscudoUE()"><i class="bi bi-check2-circle me-1"></i>Guardar escudo</button>
+                  <button class="btn btn-sm btn-outline-danger" (click)="quitarEscudoUE()"><i class="bi bi-trash3 me-1"></i>Quitar escudo</button>
+                </div>
+                <div class="small text-muted mt-2">{{ escudoMsg() || 'La imagen se reduce a 240×240 y se usa en la vista previa, el PDF y el Excel de esta U.E.' }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="card card-body mb-3">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
               <h3 class="h6 mb-0"><i class="bi bi-lock-fill me-2"></i>Bloquear edición por trimestre</h3>
               <div class="d-flex gap-2">
@@ -570,6 +584,7 @@ export class AppComponent {
   linkColegio = computed(() => this.linkPara(this.slugActual()));
   adminSeccion = signal<'unidades' | 'configuracion' | 'areas' | 'cuadros'>('unidades');
   nuevaUE = signal(''); colegiosMsg = signal(''); escudoNuevo = signal(''); importMsg = signal('');
+  escudoEdicion = signal(''); escudoMsg = signal('');
   escudoUE = computed(() => this.colegios()[this.slugActual()]?.escudo || IMG.escudo);
   trimBloqueado = computed(() => !this.admin() && !!this.bloqueos()[this.trim()]);
   resumenGeneral = signal(''); resumenPromRet = signal(''); resumenTemas = signal(''); resumenPromedio = signal('');
@@ -646,6 +661,8 @@ export class AppComponent {
     if (!c) return;
     this.slugActual.set(slug);
     this.coleccion.set(c.coleccion);
+    this.escudoEdicion.set(c.escudo || '');
+    this.escudoMsg.set('');
     if (typeof localStorage !== 'undefined') localStorage.setItem('cuadros_colegio', slug);
     const url = new URL(window.location.href);
     if (slug === SLUG_DEFECTO) url.searchParams.delete('colegio');
@@ -668,6 +685,37 @@ export class AppComponent {
     if (!file) return;
     try { this.escudoNuevo.set(await this.reducirImagen(file)); }
     catch { this.colegiosMsg.set('No se pudo leer la imagen del escudo.'); }
+  }
+
+  async elegirEscudoUE(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    try {
+      this.escudoEdicion.set(await this.reducirImagen(file));
+      this.escudoMsg.set('Vista previa lista. Pulsa «Guardar escudo» para aplicar el cambio.');
+    } catch {
+      this.escudoMsg.set('No se pudo leer la imagen del escudo.');
+    }
+  }
+
+  async guardarEscudoUE() {
+    const slug = this.slugActual();
+    const c: any = { ...this.colegios()[slug] };
+    const escudo = this.escudoEdicion();
+    if (escudo) c.escudo = escudo;
+    else delete c.escudo;
+    try {
+      await this.fb.guardarColegios({ ...this.colegios(), [slug]: c });
+      this.escudoMsg.set('Escudo actualizado en ' + this.nombreUE() + '.');
+      this.mostrarToast('Escudo guardado');
+    } catch (e: any) {
+      this.escudoMsg.set('No se pudo guardar el escudo: ' + (e?.message ?? String(e)));
+    }
+  }
+
+  async quitarEscudoUE() {
+    this.escudoEdicion.set('');
+    await this.guardarEscudoUE();
   }
 
   private reducirImagen(file: File): Promise<string> {
