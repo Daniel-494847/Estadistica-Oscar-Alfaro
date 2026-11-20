@@ -27,6 +27,17 @@ import { IMG } from './imagenes';
       }
     </div>
 
+    <!-- Aviso flotante de guardado (1,5 s y desaparece) -->
+    @if (toast()) {
+      <div class="toast-guardado no-print" role="status" aria-live="polite"
+           style="position:fixed; top:1rem; right:1rem; z-index:9999">
+        <div class="alert alert-success shadow-lg px-4 py-3 mb-0 d-flex align-items-center gap-2">
+          <i class="bi bi-check-circle-fill fs-5"></i>
+          <span class="fw-bold">{{ toast() }}</span>
+        </div>
+      </div>
+    }
+
     <!-- 1. MENÚ PRINCIPAL -->
     @if (vista() === 'menu') {
       <section class="menu-panel">
@@ -176,17 +187,11 @@ import { IMG } from './imagenes';
           El casillero <b>T.PROG. ANUAL</b> solo se registra en el <b>1º trimestre</b> y se aplica automáticamente a los tres trimestres. Para modificarlo, edítalo en el 1º trimestre.
         </div>
       }
-      @if (trimBloqueado()) {
-        <div class="alert alert-warning small py-2 mb-3">
-          <i class="bi bi-lock-fill me-1"></i>La edición del {{ trim() }}º trimestre está bloqueada por el administrador. Solo puede consultar los datos.
-        </div>
-      }
 
       @if (tipo() === 'promret') {
         <div class="row g-2 g-md-3 mb-3">
           <div class="col-12 col-md-4"><div class="card card-body bg-primary text-white"><small class="fw-bold">ESTUDIANTES EFECTIVOS</small>
-            <input type="number" class="form-control" [value]="cur()['efec'] ?? ''" [disabled]="trimBloqueado()" (input)="set('efec', $any($event.target).value)" (wheel)="bloquearScroll($event)">
-            <small class="d-block mt-1 text-white-50" style="font-size:.7rem">Se aplica a los 3 trimestres; editable en cada uno.</small></div></div>
+            <input type="number" class="form-control" [value]="cur()['efec'] ?? ''" [disabled]="trimBloqueado()" (input)="set('efec', $any($event.target).value)" (wheel)="bloquearScroll($event)"></div></div>
           <div class="col-12 col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">TOTAL PROMOVIDOS</small>
             <input type="number" class="form-control" [class.is-invalid]="bad(totCol())" [value]="cur()['t_prom'] ?? ''" [disabled]="trimBloqueado()" (input)="set('t_prom', $any($event.target).value)" (wheel)="bloquearScroll($event)"></div></div>
           <div class="col-12 col-md-4"><div class="card card-body"><small class="fw-bold text-secondary">TOTAL RETENIDOS</small>
@@ -230,7 +235,7 @@ import { IMG } from './imagenes';
       </div>
 
       @if (guardado()) {
-        <div class="alert alert-success mt-3 text-center"><h5>¡Guardado Exitosamente!</h5>
+        <div class="alert alert-success mt-3 text-center">
           <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
             <button class="btn btn-primary" (click)="otro()">+ Registrar Otro Curso</button>
             <button class="btn btn-danger btn-lg fw-bold shadow" (click)="guardado.set(false); vista.set('menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú Principal</button>
@@ -362,6 +367,8 @@ import { IMG } from './imagenes';
     input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
     input[type='number']::-webkit-outer-spin-button,
     input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .toast-guardado { animation: toast-in .2s ease-out; }
     .hoja { max-width: 1250px; margin: 12px auto; padding: 8px; background: #fff; font-family: Cambria, serif; }
     .cab { display: flex; align-items: center; justify-content: space-between; text-align: center; margin-bottom: 8px; }
     .cab img { height: 64px; } .cab .b { font-weight: bold; font-size: 12pt; }
@@ -432,6 +439,7 @@ export class AppComponent {
   lugar = signal('Bermejo, 08 de mayo de 2026');
   datos = signal<Record<string, Fila | undefined>>({}); // todos los grados del cuadro abierto
   msg = signal(''); cargando = signal(false); guardado = signal(false);
+  toast = signal(''); private toastTimer: any;
   informeTrim = signal(1); generandoInforme = signal(false); informeMsg = signal('');
   pdfTipo = signal<Tipo>('temas'); pdfTrim = signal(0); pdfPreparado = signal(false); // 0 = todos los trimestres
   correo = signal(''); clave = signal(''); // formulario de acceso administrador
@@ -834,6 +842,12 @@ export class AppComponent {
     } catch { this.datos.set({}); }
     this.cargando.set(false);
   }
+  private mostrarToast(mensaje: string) {
+    clearTimeout(this.toastTimer);
+    this.toast.set(mensaje);
+    this.toastTimer = setTimeout(() => this.toast.set(''), 1500);
+  }
+
   async guardar() {
     if (this.trimBloqueado()) { this.msg.set('La edición de este trimestre está bloqueada por el administrador'); return; }
     this.cargando.set(true);
@@ -845,6 +859,7 @@ export class AppComponent {
         : this.cur();
       await this.fb.guardarGrado(this.id(), gid(this.grado()), fila, { gestion: this.gestion(), lugar: this.lugar() });
       this.guardado.set(true);
+      this.mostrarToast('Guardado exitosamente');
     } catch { this.msg.set('No se pudo guardar (revisa la configuración de Firebase)'); }
     this.cargando.set(false);
   }
