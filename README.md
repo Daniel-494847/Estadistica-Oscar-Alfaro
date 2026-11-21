@@ -127,6 +127,8 @@ En la cabecera de la sección hay un selector **Tipo de gráfico** con ocho opci
 
 En el modo **Histograma** se muestra una tarjeta única a todo el ancho, porque sus datos tienen requisitos distintos a los de los cuatro gráficos comparativos. El informe Word incluye los gráficos visibles en el modo seleccionado.
 
+Los reportes descargados desde el celular mantienen **el mismo formato horizontal que en una computadora**: el PDF captura la vista previa con ancho de escritorio (1250 px) y el Word inserta los gráficos renderizados a 1100 px; el Excel ya define `orientation="landscape"` en todas sus hojas.
+
 Los porcentajes se muestran como **números enteros** con signo `%` **debajo de cada gráfico**, en **cuatro columnas alineadas con su barra o punto** (1º, 2º y 3º trimestre, y **PROMEDIO ANUAL**) y con un dato por línea, por ejemplo:
 
 ```text

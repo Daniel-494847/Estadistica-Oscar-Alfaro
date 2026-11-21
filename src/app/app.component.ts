@@ -1421,6 +1421,45 @@ export class AppComponent {
     this.cargando.set(false);
   }
 
+  /** Captura los gráficos con tamaño de escritorio para insertarlos igual en el Word del celular. */
+  private async capturarGraficosEscritorio(ids: string[]) {
+    const { Chart } = await import('chart.js');
+    const cont = document.createElement('div');
+    cont.style.cssText = 'position:fixed;left:-10000px;top:0;width:1100px;height:380px;visibility:hidden;pointer-events:none;';
+    document.body.appendChild(cont);
+    const capturas: { data: Uint8Array; alto: number }[] = [];
+    const altoBase = this.columnasGraficos() === 1 ? 380 : 320;
+    try {
+      for (const id of ids) {
+        const original = this.charts.find(c => c?.canvas?.id === id);
+        if (!original) continue;
+        const canvas = document.createElement('canvas');
+        canvas.width = 1100;
+        canvas.height = id === 'grafHistograma' ? 320 : altoBase;
+        cont.appendChild(canvas);
+        const cfg = original.config as any;
+        const copia = new Chart(canvas, {
+          type: cfg.type,
+          data: JSON.parse(JSON.stringify(cfg.data)),
+          options: { ...cfg.options, responsive: false, maintainAspectRatio: false, animation: false },
+          plugins: cfg.plugins,
+        });
+        copia.update('none');
+        await new Promise(r => requestAnimationFrame(r));
+        const base64 = canvas.toDataURL('image/png').split(',')[1] ?? '';
+        capturas.push({
+          data: Uint8Array.from(atob(base64), ch => ch.charCodeAt(0)),
+          alto: canvas.height,
+        });
+        copia.destroy();
+        canvas.remove();
+      }
+    } finally {
+      cont.remove();
+    }
+    return capturas;
+  }
+
   async descargarInformeWord() {
     this.generandoInforme.set(true); this.informeMsg.set('Generando informe...');
     try {
@@ -1466,14 +1505,13 @@ export class AppComponent {
         children: [new TextRun({ text: texto, bold: true, size })], alignment: AlignmentType.CENTER, spacing: { after },
       });
 
-      const imagen = (id: string) => {
-        const c = document.getElementById(id) as HTMLCanvasElement | null;
-        if (!c) return null;
-        const base64 = c.toDataURL('image/png').split(',')[1] ?? '';
-        const data = Uint8Array.from(atob(base64), ch => ch.charCodeAt(0));
+      const imagen = (cap: { data: Uint8Array; alto: number }) => {
         const ancho = 620;
         return new Paragraph({
-          children: [new ImageRun({ data, type: 'png', transformation: { width: ancho, height: Math.round(ancho * c.height / c.width) } })],
+          children: [new ImageRun({
+            data: cap.data, type: 'png',
+            transformation: { width: ancho, height: Math.round(ancho * cap.alto / 1100) },
+          })],
           alignment: AlignmentType.CENTER, spacing: { after: 160 },
         });
       };
@@ -1510,10 +1548,8 @@ export class AppComponent {
       const idsGraficos = this.tipoGrafico() === 'histograma'
         ? ['grafHistograma']
         : ['grafGeneral', 'grafPromRet', 'grafTemas', 'grafPromedios'];
-      for (const id of idsGraficos) {
-        const img = imagen(id);
-        if (img) children.push(img);
-      }
+      const capturas = await this.capturarGraficosEscritorio(idsGraficos);
+      for (const cap of capturas) children.push(imagen(cap));
       children.push(new Paragraph({
         children: [new TextRun({ text: 'Los porcentajes y el promedio general se presentan con dos decimales. Los gráficos comparan 1º, 2º y 3º trimestre.', size: 18 })],
         spacing: { before: 120 },
@@ -1655,7 +1691,7 @@ export class AppComponent {
     this.cargando.set(false);
   }
 
-  // PDF idéntico a la vista previa: se captura la hoja tal como se ve en pantalla
+  // PDF con el mismo formato horizontal que en una computadora, incluso desde el celular.
   private async cargarLibsPDF() {
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
       import('html2canvas'), import('jspdf'),
@@ -1666,11 +1702,28 @@ export class AppComponent {
   private async generarPDF(libs: Awaited<ReturnType<AppComponent['cargarLibsPDF']>>, nombreArchivo: string) {
     const hoja = document.querySelector<HTMLElement>('.hoja');
     if (!hoja) throw new Error('No se encontró la vista previa');
+    // Se captura una copia con el ancho de escritorio para que en el celular
+    // el PDF conserve la misma proporción horizontal y no se divida en varias páginas.
+    const anchoEscritorio = 1250;
+    const copia = hoja.cloneNode(true) as HTMLElement;
+    copia.style.cssText = `position:fixed;left:-10000px;top:0;width:${anchoEscritorio}px;max-width:none;margin:0;padding:8px;background:#fff;z-index:-1;`;
+    const orig = hoja.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select');
+    const dest = copia.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select');
+    orig.forEach((el, i) => { if (dest[i]) dest[i].value = el.value; });
+    document.body.appendChild(copia);
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const canvas = await libs.html2canvas(hoja, {
-      scale: 2, backgroundColor: '#ffffff', useCORS: true,
-      windowWidth: hoja.scrollWidth, windowHeight: hoja.scrollHeight,
-    });
+    await Promise.all([...copia.querySelectorAll('img')].map(img => img.complete
+      ? Promise.resolve()
+      : new Promise(res => { img.onload = img.onerror = () => res(null); })));
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await libs.html2canvas(copia, {
+        scale: 2, backgroundColor: '#ffffff', useCORS: true,
+        windowWidth: anchoEscritorio, windowHeight: Math.max(copia.scrollHeight, 800),
+      });
+    } finally {
+      copia.remove();
+    }
     const pdf = new libs.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
     const margen = 8;
     const ancho = pdf.internal.pageSize.getWidth() - margen * 2;
