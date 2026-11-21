@@ -484,7 +484,7 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
                 <option [value]="0">1º trimestre</option>
                 <option [value]="1">2º trimestre</option>
                 <option [value]="2">3º trimestre</option>
-                <option [value]="3">Promedio 3 trimestres</option>
+                <option [value]="3">Promedio anual</option>
               </select>
             </span>
           </div>
@@ -505,19 +505,19 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
         <div class="row g-4">
           <div class="col-lg-6"><div class="card h-100">
             <div class="card-header fw-bold">Generales por trimestre y promedio</div>
-            <div class="card-body py-2"><div style="height:275px"><canvas id="grafGeneral"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenGeneral() }}</div></div>
+            <div class="card-body py-2"><div style="height:320px"><canvas id="grafGeneral"></canvas></div></div>
           </div></div>
           <div class="col-lg-6"><div class="card h-100">
             <div class="card-header fw-bold">Retenidos y aprobados + promedio</div>
-            <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromRet"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromRet() }}</div></div>
+            <div class="card-body py-2"><div style="height:320px"><canvas id="grafPromRet"></canvas></div></div>
           </div></div>
           <div class="col-lg-6"><div class="card h-100">
             <div class="card-header fw-bold">Temas programados y avanzados + promedio</div>
-            <div class="card-body py-2"><div style="height:275px"><canvas id="grafTemas"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenTemas() }}</div></div>
+            <div class="card-body py-2"><div style="height:320px"><canvas id="grafTemas"></canvas></div></div>
           </div></div>
           <div class="col-lg-6"><div class="card h-100">
-            <div class="card-header fw-bold">Promedios + promedio de los 3 trimestres</div>
-            <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromedios"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromedio() }}</div></div>
+            <div class="card-header fw-bold">Promedios + promedio anual</div>
+            <div class="card-body py-2"><div style="height:320px"><canvas id="grafPromedios"></canvas></div></div>
           </div></div>
         </div>
       }
@@ -658,7 +658,7 @@ export class AppComponent {
   vista = signal<'menu' | 'form' | 'previa' | 'graficos' | 'admin'>('menu');
   charts: any[] = [];
   tipoGrafico = signal<TipoGrafico>('columna');
-  trimPastel = signal(3); // 0..2 = trimestres, 3 = promedio de los tres
+  trimPastel = signal(3); // 0..2 = trimestres, 3 = promedio anual
   resumenPastel = signal(''); resumenHistograma = signal('');
   tipo = signal<Tipo>('temas');
   trim = signal(1); // 1º, 2º y 3º trimestre disponibles
@@ -1098,6 +1098,14 @@ export class AppComponent {
     return { temas, promret, promedio, filas };
   }
 
+  /** Separa el resumen "TÍTULO\nvalor\n...\n\nTÍTULO..." en bloques para mostrarlo en columnas. */
+  columnasResumen(texto: string): { titulo: string; lineas: string[] }[] {
+    return texto.split('\n\n').map(bloque => {
+      const [titulo, ...lineas] = bloque.split('\n');
+      return { titulo, lineas };
+    });
+  }
+
   /** Cambia el tipo de gráfico redibujando con los datos ya cargados. */
   cambiarTipoGrafico(tipo: string) {
     if (!TIPOS_GRAFICO.includes(tipo as TipoGrafico) || tipo === this.tipoGrafico() || this.cargando()) return;
@@ -1131,10 +1139,10 @@ export class AppComponent {
       const paprob = conMedia(promret.map(x => num(x['t_prom'])));
       const pret = conMedia(promret.map(x => num(x['t_ret'])));
       const pro = conMedia(promedio.map(x => Number(x)));
-      const etiquetas = [...TRIMESTRES.map(t => `${t}º TRIM`), 'PROMEDIO'];
+      const etiquetas = [...TRIMESTRES.map(t => `${t}º TRIM`), 'PROMEDIO ANUAL'];
       const porTrim = (fn: (i: number) => string) => [
         ...TRIMESTRES.map((t, i) => `${t}º TRIMESTRE\n${fn(i)}`),
-        `PROMEDIO 3 TRIMESTRES\n${fn(3)}`,
+        `PROMEDIO ANUAL\n${fn(3)}`,
       ].join('\n\n');
       this.resumenGeneral.set(porTrim(i => [
         `Temas Avanzados ${Math.round(tpct[i])}%`,
@@ -1156,27 +1164,37 @@ export class AppComponent {
       };
       const tipo = this.tipoGrafico();
       const etiquetasChart = tipo === 'barras'
-        ? ['1º TRIMESTRE', '2º TRIMESTRE', '3º TRIMESTRE', 'PROMEDIO 3 TRIMESTRES']
-        : ['1º TRIM', '2º TRIM', '3º TRIM', 'PROMEDIO'];
+        ? ['1º TRIMESTRE', '2º TRIMESTRE', '3º TRIMESTRE', 'PROMEDIO ANUAL']
+        : ['1º TRIM', '2º TRIM', '3º TRIM', 'PROMEDIO ANUAL'];
       const esBarra = tipo === 'columna' || tipo === 'barras';
       const esCombo = tipo === 'combinado';
       const esPunto = tipo === 'dispersion';
       const rgba = (hex: string, a = 1) =>
         `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
-      // La dispersión usa el trimestre como eje X numérico; "PROMEDIO" no es un periodo, por eso se omite.
+      // La dispersión usa el trimestre como eje X numérico; "PROMEDIO ANUAL" no es un periodo, por eso se omite.
       const puntos = (v: number[]) => v.slice(0, 3).map((y, i) => ({ x: i + 1, y }));
 
       const opciones = (max?: number, conPorcentaje = false): any => {
-        const base: any = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' as const } } };
+        const base: any = {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' as const } },
+          // Espacio reservado para dibujar el resumen alineado con cada categoría.
+          layout: tipo === 'barras'
+            ? { padding: { left: 120, right: 8, top: 4, bottom: 4 } }
+            : { padding: { bottom: 82, top: 4 } },
+        };
         if (esPunto) {
           base.scales = {
-            x: { type: 'linear', min: 0.5, max: 3.5, ticks: { callback: (v: any) => `${v}º` }, title: { display: true, text: 'Trimestre' } },
+            x: { type: 'linear', min: 0.5, max: 3.5, ticks: { callback: (v: any) => `${v}º` } },
             y: { beginAtZero: true, ...(max ? { max } : {}) },
             ...(conPorcentaje ? { y1: { position: 'right' as const, beginAtZero: true, max: 100, grid: { drawOnChartArea: false } } } : {}),
           };
         } else if (tipo === 'barras') {
           base.indexAxis = 'y';
-          base.scales = { x: { beginAtZero: true, ...(max ? { max } : {}) } };
+          base.scales = {
+            x: { beginAtZero: true, ...(max ? { max } : {}) },
+            y: { ticks: { display: false }, grid: { display: false } },
+          };
         } else {
           base.scales = {
             y: { beginAtZero: true, ...(max ? { max } : {}) },
@@ -1237,6 +1255,34 @@ export class AppComponent {
         },
       });
 
+      // Dibuja cada bloque del resumen alineado con su categoría: debajo de la barra/punto
+      // (o a la izquierda de la barra en el modo horizontales).
+      const resumenCanvas = (texto: string) => {
+        const bloques = this.columnasResumen(texto);
+        return {
+          id: 'resumenCanvas',
+          afterDraw: (chart: any) => {
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.textBaseline = 'top';
+            (esPunto ? bloques.slice(0, 3) : bloques).forEach((bloque, i) => {
+              const x = tipo === 'barras'
+                ? chart.chartArea.left - 10
+                : esPunto ? chart.scales.x.getPixelForValue(i + 1) : chart.scales.x.getPixelForValue(i);
+              const y = tipo === 'barras'
+                ? chart.scales.y.getPixelForValue(i) - 15
+                : chart.chartArea.bottom + 26;
+              ctx.textAlign = tipo === 'barras' ? 'right' : 'center';
+              ctx.font = 'bold 9px Arial'; ctx.fillStyle = '#212529';
+              ctx.fillText(bloque.titulo, x, y);
+              ctx.font = '9px Arial'; ctx.fillStyle = '#6c757d';
+              bloque.lineas.forEach((linea, j) => ctx.fillText(linea, x, y + 12 + j * 11));
+            });
+            ctx.restore();
+          },
+        };
+      };
+
       const barra = (label: string, data: number[], hex: string) => ({
         type: 'bar', label, data, backgroundColor: rgba(hex, 0.9), borderRadius: 3,
       });
@@ -1256,7 +1302,7 @@ export class AppComponent {
       if (tipo === 'pastel') {
         // Solo se usa cuando las partes suman el 100%: promovidos + retenidos.
         const i = this.trimPastel();
-        const periodo = i === 3 ? 'PROMEDIO 3 TRIMESTRES' : `${i + 1}º TRIMESTRE`;
+        const periodo = i === 3 ? 'PROMEDIO ANUAL' : `${i + 1}º TRIMESTRE`;
         this.resumenPastel.set(`${periodo}\nPromovidos ${Math.round(pp[i])}% · Retenidos ${Math.round(pr[i])}%\nAmbas partes suman ${Math.round(pp[i] + pr[i])}% del total.`);
         crear('grafPastel', {
           type: 'pie',
@@ -1313,22 +1359,22 @@ export class AppComponent {
 
         crear('grafGeneral', {
           type: rootType,
-          plugins: [etiquetasValores(v => `${Math.round(v)}%`, tipo === 'barras')],
+          plugins: [etiquetasValores(v => `${Math.round(v)}%`, tipo === 'barras'), resumenCanvas(this.resumenGeneral())],
           data: { labels: etiquetasFinal, datasets: dsGenerales }, options: opciones(100, esCombo),
         });
         crear('grafPromRet', {
           type: rootType,
-          plugins: [etiquetasValores((v, ds) => ds.yAxisID === 'y1' ? '' : String(Math.round(v)), tipo === 'barras')],
+          plugins: [etiquetasValores((v, ds) => ds.yAxisID === 'y1' ? '' : String(Math.round(v)), tipo === 'barras'), resumenCanvas(this.resumenPromRet())],
           data: { labels: etiquetasFinal, datasets: dsPromRet }, options: opciones(undefined, !esBarra),
         });
         crear('grafTemas', {
           type: rootType,
-          plugins: [etiquetasValores((v, ds) => ds.yAxisID === 'y1' ? '' : String(Math.round(v)), tipo === 'barras')],
+          plugins: [etiquetasValores((v, ds) => ds.yAxisID === 'y1' ? '' : String(Math.round(v)), tipo === 'barras'), resumenCanvas(this.resumenTemas())],
           data: { labels: etiquetasFinal, datasets: dsTemas }, options: opciones(undefined, !esBarra),
         });
         crear('grafPromedios', {
           type: rootType,
-          plugins: [etiquetasValores(v => v.toFixed(2), tipo === 'barras')],
+          plugins: [etiquetasValores(v => v.toFixed(2), tipo === 'barras'), resumenCanvas(this.resumenPromedio())],
           data: { labels: etiquetasFinal, datasets: dsPromedios }, options: opciones(100, esCombo),
         });
       }
