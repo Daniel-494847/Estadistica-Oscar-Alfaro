@@ -142,7 +142,13 @@ import { IMG } from './imagenes';
                   <div class="small text-muted">{{ coleccion() }}</div>
                 </div>
               </div>
-              <button class="btn btn-sm btn-outline-primary" (click)="copiarLink()"><i class="bi bi-link-45deg me-1"></i>Copiar enlace de esta U.E.</button>
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-outline-primary" (click)="copiarLink()"><i class="bi bi-link-45deg me-1"></i>Copiar enlace de esta U.E.</button>
+                <button class="btn btn-sm btn-outline-success" (click)="descargarRespaldoActual()" [disabled]="respaldando()"
+                        title="Descarga un respaldo .json de la base de datos de la unidad educativa seleccionada">
+                  <i class="bi bi-download me-1"></i>{{ respaldando() ? 'Generando respaldo...' : 'Descargar respaldo (.json)' }}
+                </button>
+              </div>
             </div>
           </div>
           <ul class="nav nav-tabs mb-3">
@@ -161,7 +167,9 @@ import { IMG } from './imagenes';
                   <span class="fw-semibold">{{ c.nombre }} <small class="text-muted">({{ c.coleccion }})</small></span>
                   <span class="d-flex gap-2 align-items-center">
                     <button class="btn btn-sm btn-outline-primary" (click)="cambiarColegio(c.slug)">Usar</button>
-                    <button class="btn btn-sm btn-outline-danger" (click)="quitarColegio(c.slug)" title="Descarga un respaldo JSON y elimina la unidad"><i class="bi bi-trash3"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" (click)="confirmarEliminarColegio(c.slug)"
+                            [disabled]="c.slug === slugDefecto"
+                            [title]="c.slug === slugDefecto ? 'La unidad original no se puede eliminar' : 'Eliminar la unidad y sus datos (requiere respaldo previo)'"><i class="bi bi-trash3"></i></button>
                   </span>
                 </div>
               }
@@ -483,6 +491,49 @@ import { IMG } from './imagenes';
         </div>
       </div>
     </div>
+  }
+
+  <!-- Eliminar U.E.: advertencia + respaldo obligatorio antes de borrar de Firestore y del panel -->
+  @if (ueEliminar(); as ue) {
+    <div class="modal d-block no-print" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="eliminarUETitulo" style="z-index:1060">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+          <div class="modal-header bg-warning-subtle border-warning">
+            <h5 class="modal-title fw-bold" id="eliminarUETitulo">
+              <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Eliminar unidad educativa
+            </h5>
+            <button type="button" class="btn-close" aria-label="Cerrar" (click)="cancelarEliminarColegio()" [disabled]="eliminando()"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">Estás por eliminar la unidad educativa <strong>{{ ue.nombre }}</strong> <small class="text-muted">({{ ue.coleccion }})</small>.</p>
+            <div class="alert alert-danger small">
+              <i class="bi bi-exclamation-octagon-fill me-1"></i>
+              Esta acción es <strong>irreversible</strong>: se borrarán todos sus cuadros y su configuración de la base de datos, y la unidad desaparecerá del panel del administrador.
+            </div>
+            <p class="fw-semibold mb-2">Paso 1 · Descarga el respaldo de su base de datos.</p>
+            <button type="button" class="btn btn-outline-primary w-100" (click)="descargarRespaldoUE()" [disabled]="eliminando()">
+              <i class="bi bi-download me-1"></i>{{ respaldoDescargado() ? 'Volver a descargar respaldo' : 'Descargar respaldo (.json)' }}
+            </button>
+            @if (respaldoDescargado()) {
+              <div class="alert alert-success small mt-3 mb-0">
+                <i class="bi bi-check-circle-fill me-1"></i>Respaldo descargado. Ahora puedes confirmar la eliminación.
+              </div>
+            } @else {
+              <div class="form-text mt-2">Debes descargar el respaldo antes de poder eliminar la unidad.</div>
+            }
+            @if (respaldoMsg()) { <div class="small text-danger mt-2">{{ respaldoMsg() }}</div> }
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" (click)="cancelarEliminarColegio()" [disabled]="eliminando()">Cancelar</button>
+            <button type="button" class="btn btn-danger fw-bold" (click)="eliminarColegio()"
+                    [disabled]="!respaldoDescargado() || eliminando()">
+              {{ eliminando() ? 'Eliminando...' : 'Sí, descargué el respaldo y deseo eliminar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show no-print" style="z-index:1050"></div>
   }`,
   styles: [`
     /* Sin flechas de incremento/decremento en los campos numéricos */
@@ -576,8 +627,16 @@ export class AppComponent {
   areasCfg = signal<Area[]>(AREAS_POR_DEFECTO); // áreas de aprendizaje de la U.E. actual
   areasMsg = signal(''); areaNombre = signal(''); areaCampo = signal(CAMPOS_NOMBRES[0]);
   areasVisibles = computed(() => this.areasCfg().map(a => [a.id, a.nombre] as [string, string]));
+  slugDefecto = SLUG_DEFECTO; // disponible en la plantilla para no ofrecer la papelera de la U.E. original
   colegios = signal<Record<string, Colegio>>({ [SLUG_DEFECTO]: { nombre: 'OSCAR ALFARO', coleccion: COLECCION_DEFECTO } });
   colegiosLista = computed(() => Object.entries(this.colegios()).map(([slug, c]) => ({ slug, ...c })));
+  // Confirmación de eliminación: primero se descarga el respaldo y luego se borra de Firestore y del panel
+  eliminandoSlug = signal<string | null>(null);
+  ueEliminar = computed(() => this.colegios()[this.eliminandoSlug() ?? ''] ?? null);
+  respaldoDescargado = signal(false);
+  respaldoMsg = signal('');
+  respaldando = signal(false);
+  eliminando = signal(false);
   slugActual = signal(SLUG_DEFECTO);
   coleccion = signal(COLECCION_DEFECTO);
   nombreUE = computed(() => this.colegios()[this.slugActual()]?.nombre ?? 'OSCAR ALFARO');
@@ -770,24 +829,85 @@ export class AppComponent {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
-  async quitarColegio(slug: string) {
+  /** Descarga el respaldo JSON de una unidad: nombre, escudo y todos sus documentos. */
+  private async descargarRespaldo(slug: string): Promise<boolean> {
     const c = this.colegios()[slug];
-    if (!c) return;
-    if (!window.confirm(`¿Eliminar la unidad educativa "${c.nombre}" y todos sus datos?`)) return;
-    this.colegiosMsg.set('Descargando respaldo y eliminando...');
+    if (!c) return false;
+    const datos = await this.fb.leerColeccion(c.coleccion);
+    this.descargarJson({ unidad: c.nombre, escudo: c.escudo, datos }, `respaldo-${slug}.json`);
+    return true;
+  }
+
+  /** Botón del panel: respalda la unidad educativa seleccionada sin eliminarla. */
+  async descargarRespaldoActual() {
+    const slug = this.slugActual();
+    if (!this.colegios()[slug] || this.respaldando()) return;
+    this.respaldando.set(true);
+    this.colegiosMsg.set('Generando respaldo de la unidad educativa...');
     try {
-      const datos = await this.fb.leerColeccion(c.coleccion);
-      this.descargarJson({ unidad: c.nombre, escudo: c.escudo, datos }, `respaldo-${slug}.json`);
+      await this.descargarRespaldo(slug);
+      this.colegiosMsg.set(`Respaldo de "${this.nombreUE()}" descargado correctamente.`);
+      this.mostrarToast('Respaldo descargado');
+    } catch (e) {
+      console.error(e);
+      this.colegiosMsg.set('No se pudo generar el respaldo. Revisa tu conexión e inténtalo de nuevo.');
+    } finally {
+      this.respaldando.set(false);
+    }
+  }
+
+  /** Abre la advertencia: la eliminación solo se habilita después de descargar el respaldo. */
+  confirmarEliminarColegio(slug: string) {
+    if (slug === SLUG_DEFECTO || !this.colegios()[slug]) return;
+    this.eliminandoSlug.set(slug);
+    this.respaldoDescargado.set(false);
+    this.respaldoMsg.set('');
+  }
+
+  cancelarEliminarColegio() {
+    if (this.eliminando()) return;
+    this.eliminandoSlug.set(null);
+    this.respaldoDescargado.set(false);
+    this.respaldoMsg.set('');
+  }
+
+  async descargarRespaldoUE() {
+    const slug = this.eliminandoSlug();
+    if (!slug) return;
+    this.respaldoMsg.set('');
+    try {
+      this.respaldoDescargado.set(await this.descargarRespaldo(slug));
+    } catch (e) {
+      console.error(e);
+      this.respaldoDescargado.set(false);
+      this.respaldoMsg.set('No se pudo generar el respaldo. Revisa tu conexión e inténtalo de nuevo.');
+    }
+  }
+
+  async eliminarColegio() {
+    const slug = this.eliminandoSlug();
+    const c = slug ? this.colegios()[slug] : null;
+    if (!slug || !c || !this.respaldoDescargado() || this.eliminando()) return;
+    this.eliminando.set(true);
+    this.colegiosMsg.set('Eliminando unidad educativa...');
+    try {
+      // 1) se borran los documentos de su colección en la base de datos
       await this.fb.borrarColegio(c.coleccion);
+      // 2) se quita del registro central: desaparece del panel del administrador
       const reg = { ...this.colegios() };
       delete reg[slug];
       await this.fb.guardarColegios(reg);
       this.colegios.set(reg);
       if (this.slugActual() === slug) await this.cambiarColegio(SLUG_DEFECTO, false);
-      this.colegiosMsg.set(`Respaldo descargado y unidad educativa "${c.nombre}" eliminada.`);
+      this.eliminandoSlug.set(null);
+      this.respaldoDescargado.set(false);
+      this.colegiosMsg.set(`Unidad educativa "${c.nombre}" eliminada del panel y de la base de datos.`);
+      this.mostrarToast('Unidad educativa eliminada');
     } catch (e) {
       console.error(e);
-      this.colegiosMsg.set('No se pudo eliminar la unidad educativa.');
+      this.colegiosMsg.set('No se pudo eliminar la unidad educativa. Revisa tu conexión e inténtalo de nuevo.');
+    } finally {
+      this.eliminando.set(false);
     }
   }
 
