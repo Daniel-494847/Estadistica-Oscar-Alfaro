@@ -468,6 +468,15 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
             <option value="combinado">Combinado</option>
           </select>
         </div>
+        <div class="col-12 col-sm-auto">
+          <label for="columnasGraficos" class="small text-muted me-2">Columnas</label>
+          <select id="columnasGraficos" class="form-select form-select-sm w-auto d-inline-block"
+                  [value]="columnasGraficos()" [disabled]="cargando()"
+                  (change)="cambiarColumnas(+$any($event.target).value)">
+            <option [value]="1">1 columna</option>
+            <option [value]="2">2 columnas</option>
+          </select>
+        </div>
         <div class="col-12 col-sm-auto text-center">
           <span class="small text-muted">{{ cargando() ? 'Cargando datos...' : msg() }}</span>
         </div>
@@ -503,19 +512,19 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
         </div></div></div>
       } @else {
         <div class="row g-4">
-          <div class="col-lg-6"><div class="card h-100">
+          <div [class]="columnasGraficos() === 1 ? 'col-12' : 'col-12 col-lg-6'"><div class="card h-100">
             <div class="card-header fw-bold">Generales por trimestre y promedio</div>
             <div class="card-body py-2"><div style="height:320px"><canvas id="grafGeneral"></canvas></div></div>
           </div></div>
-          <div class="col-lg-6"><div class="card h-100">
+          <div [class]="columnasGraficos() === 1 ? 'col-12' : 'col-12 col-lg-6'"><div class="card h-100">
             <div class="card-header fw-bold">Retenidos y aprobados + promedio</div>
             <div class="card-body py-2"><div style="height:320px"><canvas id="grafPromRet"></canvas></div></div>
           </div></div>
-          <div class="col-lg-6"><div class="card h-100">
+          <div [class]="columnasGraficos() === 1 ? 'col-12' : 'col-12 col-lg-6'"><div class="card h-100">
             <div class="card-header fw-bold">Temas programados y avanzados + promedio</div>
             <div class="card-body py-2"><div style="height:320px"><canvas id="grafTemas"></canvas></div></div>
           </div></div>
-          <div class="col-lg-6"><div class="card h-100">
+          <div [class]="columnasGraficos() === 1 ? 'col-12' : 'col-12 col-lg-6'"><div class="card h-100">
             <div class="card-header fw-bold">Promedios + promedio anual</div>
             <div class="card-body py-2"><div style="height:320px"><canvas id="grafPromedios"></canvas></div></div>
           </div></div>
@@ -658,6 +667,7 @@ export class AppComponent {
   vista = signal<'menu' | 'form' | 'previa' | 'graficos' | 'admin'>('menu');
   charts: any[] = [];
   tipoGrafico = signal<TipoGrafico>('columna');
+  columnasGraficos = signal<1 | 2>(2);
   trimPastel = signal(3); // 0..2 = trimestres, 3 = promedio anual
   resumenPastel = signal(''); resumenHistograma = signal('');
   tipo = signal<Tipo>('temas');
@@ -1119,6 +1129,13 @@ export class AppComponent {
     void this.abrirGraficos(false);
   }
 
+  /** Cambia entre una y dos columnas de gráficos sin recargar los datos. */
+  cambiarColumnas(n: number) {
+    if (n !== 1 && n !== 2) return;
+    this.columnasGraficos.set(n as 1 | 2);
+    setTimeout(() => this.charts.forEach(c => c.resize()), 0);
+  }
+
   async abrirGraficos(recargarDatos = true) {
     this.vista.set('graficos');
     this.cargando.set(true); this.msg.set('Cargando datos...');
@@ -1269,9 +1286,10 @@ export class AppComponent {
               const x = tipo === 'barras'
                 ? chart.chartArea.left - 10
                 : esPunto ? chart.scales.x.getPixelForValue(i + 1) : chart.scales.x.getPixelForValue(i);
+              const inferior = (chart.options.layout?.padding as any)?.bottom ?? 82;
               const y = tipo === 'barras'
                 ? chart.scales.y.getPixelForValue(i) - 15
-                : chart.chartArea.bottom + 26;
+                : chart.height - inferior + 2;
               ctx.textAlign = tipo === 'barras' ? 'right' : 'center';
               ctx.font = 'bold 9px Arial'; ctx.fillStyle = '#212529';
               ctx.fillText(bloque.titulo, x, y);
@@ -1303,12 +1321,18 @@ export class AppComponent {
         // Solo se usa cuando las partes suman el 100%: promovidos + retenidos.
         const i = this.trimPastel();
         const periodo = i === 3 ? 'PROMEDIO ANUAL' : `${i + 1}º TRIMESTRE`;
-        this.resumenPastel.set(`${periodo}\nPromovidos ${Math.round(pp[i])}% · Retenidos ${Math.round(pr[i])}%\nAmbas partes suman ${Math.round(pp[i] + pr[i])}% del total.`);
+        // Se calcula sobre cantidades, no sobre la media de porcentajes: así las dos partes siempre suman 100%.
+        const totalEst = paprob[i] + pret[i];
+        const promPie = totalEst > 0 ? +(paprob[i] / totalEst * 100).toFixed(2) : 0;
+        const retPie = totalEst > 0 ? +(pret[i] / totalEst * 100).toFixed(2) : 0;
+        this.resumenPastel.set(totalEst > 0
+          ? `${periodo}\nPromovidos ${Math.round(promPie)}% · Retenidos ${Math.round(retPie)}% del total de estudiantes.\nAmbas partes suman 100%.`
+          : `${periodo}\nSin datos registrados para este periodo.`);
         crear('grafPastel', {
           type: 'pie',
           plugins: [etiquetasArco(v => `${Math.round(v)}%`)],
           data: { labels: ['Promovidos', 'Retenidos'], datasets: [{
-            data: [pp[i], pr[i]], backgroundColor: ['#198754', '#dc3545'], borderColor: '#fff', borderWidth: 2,
+            data: [promPie, retPie], backgroundColor: ['#198754', '#dc3545'], borderColor: '#fff', borderWidth: 2,
           }] },
           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' as const } } },
         });
