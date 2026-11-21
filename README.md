@@ -112,6 +112,21 @@ El PDF se genera con `html2canvas` + `jspdf`; el Excel con `xlsx-js-style` y `ff
   - **Temas programados y avanzados**: cantidades por trimestre y línea de porcentaje de temas avanzados (eje derecho).
   - **Promedios**: promedio general de la Unidad Educativa.
 
+En la cabecera de la sección hay un selector **Tipo de gráfico** con ocho opciones, aplicadas según la naturaleza de cada dato:
+
+| Tipo | Uso en esta sección |
+| --- | --- |
+| **Columna** | Comparación de magnitudes discretas: barras verticales de porcentajes, conteos y promedios. |
+| **Línea** | Tendencia de 1º a 3º trimestre, incluido el promedio de los tres. |
+| **Pastel** | Distribución proporcional de **promovidos vs. retenidos**, único dato cuyas partes suman 100%. Se elige el periodo en el selector `Periodo`. |
+| **Barras horizontales** | Misma comparación que columnas, con etiquetas largas (`1º TRIMESTRE`, `PROMEDIO 3 TRIMESTRES`) para evitar que el texto se amontone. |
+| **Área** | Tendencia con el área inferior rellena, que resalta el volumen acumulado. |
+| **Dispersión XY** | Correlación entre el trimestre (eje X numérico 1, 2, 3) y cada variable (eje Y). Se omite `PROMEDIO` porque no es un periodo. |
+| **Histograma** | Distribución de frecuencias de los promedios por grado, agrupados en rangos de 10 puntos (0-9, 10-19, …, 90-100). |
+| **Combinado** | Columnas de conteos o porcentajes junto con líneas de otra unidad en el eje derecho (por ejemplo, promedio general + % de temas avanzados). |
+
+En los modos **Pastel** e **Histograma** se muestra una tarjeta única a todo el ancho, porque sus datos tienen requisitos distintos a los de los cuatro gráficos comparativos. El informe Word incluye el gráfico visible en el modo seleccionado.
+
 Los porcentajes se muestran como **números enteros** con signo `%` **debajo de cada gráfico**, agrupados por trimestre y con un dato por línea, por ejemplo:
 
 ```text

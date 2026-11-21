@@ -5,6 +5,9 @@ import { ExportService } from './export.service';
 import { COLECCION_DEFECTO, Colegio, FirebaseService, IDS_CUADRO, SLUG_DEFECTO } from './firebase.service';
 import { IMG } from './imagenes';
 
+type TipoGrafico = 'columna' | 'linea' | 'pastel' | 'barras' | 'area' | 'dispersion' | 'histograma' | 'combinado';
+const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'area', 'dispersion', 'histograma', 'combinado'];
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -450,28 +453,74 @@ import { IMG } from './imagenes';
         <div class="col-12 col-sm">
           <h2 class="h5 mb-0 text-center text-sm-start">Gráficos Estadísticos · Unidad Educativa "{{ nombreUE() }}"</h2>
         </div>
+        <div class="col-12 col-sm-auto">
+          <label for="tipoGrafico" class="small text-muted me-2">Tipo de gráfico</label>
+          <select id="tipoGrafico" class="form-select form-select-sm w-auto d-inline-block"
+                  [value]="tipoGrafico()" [disabled]="cargando()"
+                  (change)="cambiarTipoGrafico($any($event.target).value)">
+            <option value="columna">Columna</option>
+            <option value="linea">Línea</option>
+            <option value="pastel">Pastel</option>
+            <option value="barras">Barras horizontales</option>
+            <option value="area">Área</option>
+            <option value="dispersion">Dispersión XY</option>
+            <option value="histograma">Histograma</option>
+            <option value="combinado">Combinado</option>
+          </select>
+        </div>
         <div class="col-12 col-sm-auto text-center">
           <span class="small text-muted">{{ cargando() ? 'Cargando datos...' : msg() }}</span>
         </div>
       </div>
-      <div class="row g-4">
-        <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Generales por trimestre y promedio</div>
-          <div class="card-body py-2"><div style="height:275px"><canvas id="grafGeneral"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenGeneral() }}</div></div>
-        </div></div>
-        <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Retenidos y aprobados + promedio</div>
-          <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromRet"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromRet() }}</div></div>
-        </div></div>
-        <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Temas programados y avanzados + promedio</div>
-          <div class="card-body py-2"><div style="height:275px"><canvas id="grafTemas"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenTemas() }}</div></div>
-        </div></div>
-        <div class="col-lg-6"><div class="card h-100">
-          <div class="card-header fw-bold">Promedios + promedio de los 3 trimestres</div>
-          <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromedios"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromedio() }}</div></div>
-        </div></div>
-      </div>
+
+      @if (tipoGrafico() === 'pastel') {
+        <div class="row g-4"><div class="col-12"><div class="card h-100">
+          <div class="card-header fw-bold d-flex flex-wrap gap-2 align-items-center justify-content-between">
+            <span><i class="bi bi-pie-chart-fill me-2"></i>Distribución proporcional: promovidos y retenidos</span>
+            <span class="d-flex align-items-center gap-2">
+              <label for="trimPastel" class="small text-muted mb-0">Periodo</label>
+              <select id="trimPastel" class="form-select form-select-sm w-auto" [value]="trimPastel()" [disabled]="cargando()"
+                      (change)="cambiarTrimPastel(+$any($event.target).value)">
+                <option [value]="0">1º trimestre</option>
+                <option [value]="1">2º trimestre</option>
+                <option [value]="2">3º trimestre</option>
+                <option [value]="3">Promedio 3 trimestres</option>
+              </select>
+            </span>
+          </div>
+          <div class="card-body py-2">
+            <div style="height:320px"><canvas id="grafPastel"></canvas></div>
+            <div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPastel() }}</div>
+          </div>
+        </div></div></div>
+      } @else if (tipoGrafico() === 'histograma') {
+        <div class="row g-4"><div class="col-12"><div class="card h-100">
+          <div class="card-header fw-bold"><i class="bi bi-bar-chart-fill me-2"></i>Distribución de frecuencias del promedio por grado</div>
+          <div class="card-body py-2">
+            <div style="height:320px"><canvas id="grafHistograma"></canvas></div>
+            <div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenHistograma() }}</div>
+          </div>
+        </div></div></div>
+      } @else {
+        <div class="row g-4">
+          <div class="col-lg-6"><div class="card h-100">
+            <div class="card-header fw-bold">Generales por trimestre y promedio</div>
+            <div class="card-body py-2"><div style="height:275px"><canvas id="grafGeneral"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenGeneral() }}</div></div>
+          </div></div>
+          <div class="col-lg-6"><div class="card h-100">
+            <div class="card-header fw-bold">Retenidos y aprobados + promedio</div>
+            <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromRet"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromRet() }}</div></div>
+          </div></div>
+          <div class="col-lg-6"><div class="card h-100">
+            <div class="card-header fw-bold">Temas programados y avanzados + promedio</div>
+            <div class="card-body py-2"><div style="height:275px"><canvas id="grafTemas"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenTemas() }}</div></div>
+          </div></div>
+          <div class="col-lg-6"><div class="card h-100">
+            <div class="card-header fw-bold">Promedios + promedio de los 3 trimestres</div>
+            <div class="card-body py-2"><div style="height:275px"><canvas id="grafPromedios"></canvas></div><div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPromedio() }}</div></div>
+          </div></div>
+        </div>
+      }
       <div class="card mt-4">
         <div class="card-body">
           <div class="row g-2 align-items-center">
@@ -608,6 +657,9 @@ export class AppComponent {
 
   vista = signal<'menu' | 'form' | 'previa' | 'graficos' | 'admin'>('menu');
   charts: any[] = [];
+  tipoGrafico = signal<TipoGrafico>('columna');
+  trimPastel = signal(3); // 0..2 = trimestres, 3 = promedio de los tres
+  resumenPastel = signal(''); resumenHistograma = signal('');
   tipo = signal<Tipo>('temas');
   trim = signal(1); // 1º, 2º y 3º trimestre disponibles
   grado = signal('1ºA');
@@ -1046,13 +1098,26 @@ export class AppComponent {
     return { temas, promret, promedio, filas };
   }
 
-  async abrirGraficos() {
+  /** Cambia el tipo de gráfico redibujando con los datos ya cargados. */
+  cambiarTipoGrafico(tipo: string) {
+    if (!TIPOS_GRAFICO.includes(tipo as TipoGrafico) || tipo === this.tipoGrafico() || this.cargando()) return;
+    this.tipoGrafico.set(tipo as TipoGrafico);
+    void this.abrirGraficos(false);
+  }
+
+  cambiarTrimPastel(trim: number) {
+    if (![0, 1, 2, 3].includes(trim) || trim === this.trimPastel() || this.cargando()) return;
+    this.trimPastel.set(trim);
+    void this.abrirGraficos(false);
+  }
+
+  async abrirGraficos(recargarDatos = true) {
     this.vista.set('graficos');
     this.cargando.set(true); this.msg.set('Cargando datos...');
     this.charts.forEach(c => c.destroy()); this.charts = [];
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, recargarDatos ? 300 : 30));
     try {
-      this.agregados = await this.obtenerAgregados();
+      if (recargarDatos || !this.agregados) this.agregados = await this.obtenerAgregados();
       const { temas, promret, promedio }: { temas: Fila[]; promret: Fila[]; promedio: number[]; filas: any[] } = this.agregados;
       const num = (v: any) => +(String(v ?? '').replace('%', '')) || 0;
       // Cada serie lleva un cuarto valor: la media de los tres trimestres.
@@ -1089,81 +1154,184 @@ export class AppComponent {
         const el = document.getElementById(id) as HTMLCanvasElement | null;
         if (el) this.charts.push(new Chart(el, config));
       };
-      const opciones = (max?: number, conPorcentaje = false) => ({
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' as const } },
-        scales: {
-          y: { beginAtZero: true, position: 'left' as const, ...(max ? { max } : {}) },
-          ...(conPorcentaje ? {
-            y1: { position: 'right' as const, beginAtZero: true, max: 100, grid: { drawOnChartArea: false } },
-          } : {}),
-        },
-      });
-      // Escribe el valor numérico sobre cada barra o punto del gráfico.
-      const etiquetasValores = (formato: (v: number, ds: any, di: number, i: number) => string) => ({
+      const tipo = this.tipoGrafico();
+      const etiquetasChart = tipo === 'barras'
+        ? ['1º TRIMESTRE', '2º TRIMESTRE', '3º TRIMESTRE', 'PROMEDIO 3 TRIMESTRES']
+        : ['1º TRIM', '2º TRIM', '3º TRIM', 'PROMEDIO'];
+      const esBarra = tipo === 'columna' || tipo === 'barras';
+      const esCombo = tipo === 'combinado';
+      const esPunto = tipo === 'dispersion';
+      const rgba = (hex: string, a = 1) =>
+        `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
+      // La dispersión usa el trimestre como eje X numérico; "PROMEDIO" no es un periodo, por eso se omite.
+      const puntos = (v: number[]) => v.slice(0, 3).map((y, i) => ({ x: i + 1, y }));
+
+      const opciones = (max?: number, conPorcentaje = false): any => {
+        const base: any = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' as const } } };
+        if (esPunto) {
+          base.scales = {
+            x: { type: 'linear', min: 0.5, max: 3.5, ticks: { callback: (v: any) => `${v}º` }, title: { display: true, text: 'Trimestre' } },
+            y: { beginAtZero: true, ...(max ? { max } : {}) },
+            ...(conPorcentaje ? { y1: { position: 'right' as const, beginAtZero: true, max: 100, grid: { drawOnChartArea: false } } } : {}),
+          };
+        } else if (tipo === 'barras') {
+          base.indexAxis = 'y';
+          base.scales = { x: { beginAtZero: true, ...(max ? { max } : {}) } };
+        } else {
+          base.scales = {
+            y: { beginAtZero: true, ...(max ? { max } : {}) },
+            ...(conPorcentaje ? { y1: { position: 'right' as const, beginAtZero: true, max: 100, grid: { drawOnChartArea: false } } } : {}),
+          };
+        }
+        return base;
+      };
+
+      // Escribe el valor numérico sobre cada barra, línea o punto.
+      const etiquetasValores = (formato: (v: number, ds: any, di: number, i: number) => string, horizontal = false) => ({
         id: 'etiquetasValores',
         afterDatasetsDraw(chart: any) {
           const ctx = chart.ctx;
           ctx.save();
           ctx.font = 'bold 9px Arial';
           ctx.fillStyle = '#212529';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
+          ctx.textAlign = horizontal ? 'right' : 'center';
+          ctx.textBaseline = horizontal ? 'middle' : 'bottom';
           chart.data.datasets.forEach((ds: any, di: number) => {
             const meta = chart.getDatasetMeta(di);
             if (meta.hidden) return;
             meta.data.forEach((elem: any, i: number) => {
-              const valor = Number(ds.data[i]);
+              const valor = horizontal ? Number(ds.data[i]) : Number(ds.data[i]?.y ?? ds.data[i]);
               const texto = isFinite(valor) ? formato(valor, ds, di, i) : '';
-              if (texto) ctx.fillText(texto, elem.x, Math.max(elem.y - 6 - di * 11, 11));
+              if (!texto) return;
+              if (horizontal) ctx.fillText(texto, elem.x - 6, elem.y);
+              else ctx.fillText(texto, elem.x, Math.max(elem.y - 6 - di * 11, 11));
             });
           });
           ctx.restore();
         },
       });
 
-      crear('grafGeneral', {
-        type: 'bar',
-        plugins: [etiquetasValores(v => `${Math.round(v)}%`)],
-        data: { labels: etiquetas, datasets: [
-          { label: '% Temas avanzados', data: tpct, backgroundColor: '#0d6efd' },
-          { label: '% Promovidos', data: pp, backgroundColor: '#198754' },
-          { label: '% Retenidos', data: pr, backgroundColor: '#dc3545' },
-        ] }, options: opciones(100),
+      const etiquetasArco = (formato: (v: number) => string) => ({
+        id: 'etiquetasArco',
+        afterDatasetsDraw(chart: any) {
+          const ctx = chart.ctx;
+          ctx.save();
+          ctx.font = 'bold 10px Arial';
+          ctx.fillStyle = '#0f172a';
+          ctx.shadowColor = 'rgba(255,255,255,.85)';
+          ctx.shadowBlur = 3;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          chart.data.datasets.forEach((ds: any, di: number) => {
+            const meta = chart.getDatasetMeta(di);
+            if (meta.hidden) return;
+            meta.data.forEach((elem: any, i: number) => {
+              const valor = Number(ds.data[i]);
+              if (!isFinite(valor) || !valor) return;
+              const angulo = (elem.startAngle + elem.endAngle) / 2;
+              const radio = (elem.outerRadius + elem.innerRadius) / 2;
+              ctx.fillText(formato(valor), elem.x + Math.cos(angulo) * radio, elem.y + Math.sin(angulo) * radio);
+            });
+          });
+          ctx.restore();
+        },
       });
-      crear('grafPromRet', {
-        type: 'bar',
-        plugins: [etiquetasValores((v, ds, di, i) => {
-          // El porcentaje ya va en la barra: no se repite sobre la línea.
-          if (ds.yAxisID === 'y1') return '';
-          const porc = di === 0 ? pp[i] : pr[i];
-          return `${Math.round(v)} (${Math.round(porc)}%)`;
-        })],
-        data: { labels: etiquetas, datasets: [
-          { label: 'Aprobados', data: paprob, backgroundColor: '#198754', yAxisID: 'y' },
-          { label: 'Retenidos', data: pret, backgroundColor: '#dc3545', yAxisID: 'y' },
-          { type: 'line', label: '% Aprobados', data: pp, borderColor: '#146c43', backgroundColor: '#146c43', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
-          { type: 'line', label: '% Retenidos', data: pr, borderColor: '#b02a37', backgroundColor: '#b02a37', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
-        ] }, options: opciones(undefined, true),
+
+      const barra = (label: string, data: number[], hex: string) => ({
+        type: 'bar', label, data, backgroundColor: rgba(hex, 0.9), borderRadius: 3,
       });
-      crear('grafTemas', {
-        type: 'bar',
-        plugins: [etiquetasValores((v, ds, _di, i) => ds.yAxisID === 'y1'
-          ? ''
-          : `${Math.round(v)} (${Math.round(tpct[i])}%)`)],
-        data: { labels: etiquetas, datasets: [
-          { label: 'Programados', data: tprog, backgroundColor: '#0d6efd', yAxisID: 'y' },
-          { label: 'Avanzados', data: tavanz, backgroundColor: '#6610f2', yAxisID: 'y' },
-          { type: 'line', label: '% Avanzados', data: tpct, borderColor: '#3a0ca3', backgroundColor: '#3a0ca3', borderWidth: 2, yAxisID: 'y1', tension: 0.3, pointRadius: 3, fill: false },
-        ] }, options: opciones(undefined, true),
+      const linea = (label: string, data: number[], hex: string, extra: any = {}) => ({
+        type: esPunto ? 'scatter' : 'line',
+        label,
+        data: esPunto ? puntos(data) : data,
+        ...(esPunto
+          ? { backgroundColor: hex, borderColor: hex, pointRadius: 5 }
+          : { borderColor: hex, backgroundColor: rgba(hex, tipo === 'area' ? 0.3 : 1), tension: 0.3, pointRadius: 3, fill: tipo === 'area' }),
+        ...extra,
       });
-      crear('grafPromedios', {
-        type: 'line',
-        plugins: [etiquetasValores(v => v.toFixed(2))],
-        data: { labels: etiquetas, datasets: [
-          { label: 'Promedio general', data: pro, borderColor: '#fd7e14', backgroundColor: '#fd7e14', tension: 0.3, pointRadius: 5 },
-        ] }, options: opciones(100),
-      });
+      const serie = (label: string, data: number[], hex: string, extra: any = {}) =>
+        (esBarra || esCombo) ? barra(label, data, hex) : linea(label, data, hex, extra);
+      const rootType = esPunto ? 'scatter' : (esBarra || esCombo ? 'bar' : 'line');
+
+      if (tipo === 'pastel') {
+        // Solo se usa cuando las partes suman el 100%: promovidos + retenidos.
+        const i = this.trimPastel();
+        const periodo = i === 3 ? 'PROMEDIO 3 TRIMESTRES' : `${i + 1}º TRIMESTRE`;
+        this.resumenPastel.set(`${periodo}\nPromovidos ${Math.round(pp[i])}% · Retenidos ${Math.round(pr[i])}%\nAmbas partes suman ${Math.round(pp[i] + pr[i])}% del total.`);
+        crear('grafPastel', {
+          type: 'pie',
+          plugins: [etiquetasArco(v => `${Math.round(v)}%`)],
+          data: { labels: ['Promovidos', 'Retenidos'], datasets: [{
+            data: [pp[i], pr[i]], backgroundColor: ['#198754', '#dc3545'], borderColor: '#fff', borderWidth: 2,
+          }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' as const } } },
+        });
+      } else if (tipo === 'histograma') {
+        // Frecuencias de los promedios por grado, agrupados en rangos de 10 puntos.
+        const notas: number[] = (this.agregados.filas ?? []).flatMap((f: any) =>
+          (f.promedio ?? []).map((r: any) => Number(r['prom'])).filter((v: number) => isFinite(v) && v > 0));
+        const bins = Array(10).fill(0) as number[];
+        notas.forEach(v => { bins[Math.min(9, Math.max(0, Math.floor(v / 10)))]++; });
+        this.resumenHistograma.set(notas.length
+          ? `Se analizaron ${notas.length} promedios (12 grados × 3 trimestres). Cada barra agrupa un rango de 10 puntos.`
+          : 'No hay promedios registrados para construir el histograma.');
+        crear('grafHistograma', {
+          type: 'bar',
+          data: {
+            labels: bins.map((_, i) => i === 9 ? '90-100' : `${i * 10}-${i * 10 + 9}`),
+            datasets: [{ label: 'Cantidad de grados', data: bins, backgroundColor: '#0d6efd', barPercentage: 1, categoryPercentage: 1 }],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+            scales: { x: { title: { display: true, text: 'Rango de promedio' } }, y: { beginAtZero: true, ticks: { precision: 0 } } },
+          },
+        });
+      } else {
+        const dsGenerales = esBarra
+          ? [barra('% Temas avanzados', tpct, '#0d6efd'), barra('% Promovidos', pp, '#198754'), barra('% Retenidos', pr, '#dc3545')]
+          : esCombo
+            ? [barra('% Temas avanzados', tpct, '#0d6efd'), barra('% Promovidos', pp, '#198754'), barra('% Retenidos', pr, '#dc3545'),
+               linea('Promedio general', pro, '#fd7e14', { yAxisID: 'y1', borderDash: [6, 4] })]
+            : [serie('% Temas avanzados', tpct, '#0d6efd'), serie('% Promovidos', pp, '#198754'), serie('% Retenidos', pr, '#dc3545')];
+        const dsPromRet = [
+          serie('Aprobados', paprob, '#198754'),
+          serie('Retenidos', pret, '#dc3545'),
+          ...(esBarra ? [] : [
+            linea('% Aprobados', pp, '#146c43', { yAxisID: 'y1', borderDash: [5, 4] }),
+            linea('% Retenidos', pr, '#b02a37', { yAxisID: 'y1', borderDash: [5, 4] }),
+          ]),
+        ];
+        const dsTemas = [
+          serie('Programados', tprog, '#0d6efd'),
+          serie('Avanzados', tavanz, '#6610f2'),
+          ...(esBarra ? [] : [linea('% Avanzados', tpct, '#3a0ca3', { yAxisID: 'y1', borderDash: [5, 4] })]),
+        ];
+        const dsPromedios = esCombo
+          ? [barra('Promedio general', pro, '#fd7e14'), linea('% Temas avanzados', tpct, '#6610f2', { yAxisID: 'y1', borderDash: [5, 4] })]
+          : [serie('Promedio general', pro, '#fd7e14')];
+        const etiquetasFinal = esPunto ? undefined : etiquetasChart;
+
+        crear('grafGeneral', {
+          type: rootType,
+          plugins: [etiquetasValores(v => `${Math.round(v)}%`, tipo === 'barras')],
+          data: { labels: etiquetasFinal, datasets: dsGenerales }, options: opciones(100, esCombo),
+        });
+        crear('grafPromRet', {
+          type: rootType,
+          plugins: [etiquetasValores((v, ds) => ds.yAxisID === 'y1' ? '' : String(Math.round(v)), tipo === 'barras')],
+          data: { labels: etiquetasFinal, datasets: dsPromRet }, options: opciones(undefined, !esBarra),
+        });
+        crear('grafTemas', {
+          type: rootType,
+          plugins: [etiquetasValores((v, ds) => ds.yAxisID === 'y1' ? '' : String(Math.round(v)), tipo === 'barras')],
+          data: { labels: etiquetasFinal, datasets: dsTemas }, options: opciones(undefined, !esBarra),
+        });
+        crear('grafPromedios', {
+          type: rootType,
+          plugins: [etiquetasValores(v => v.toFixed(2), tipo === 'barras')],
+          data: { labels: etiquetasFinal, datasets: dsPromedios }, options: opciones(100, esCombo),
+        });
+      }
       this.msg.set('');
     } catch (e) { console.error(e); this.msg.set('No se pudieron cargar los gráficos'); }
     this.cargando.set(false);
@@ -1255,7 +1423,10 @@ export class AppComponent {
           GRADOS.map((g, k) => [g, d(filas.promedio[k]['prom'], 2)]), [50, 50]),
         titulo('5. Gráficos comparativos de los tres trimestres'),
       ];
-      for (const id of ['grafGeneral', 'grafPromRet', 'grafTemas', 'grafPromedios']) {
+      const idsGraficos = this.tipoGrafico() === 'pastel' ? ['grafPastel']
+        : this.tipoGrafico() === 'histograma' ? ['grafHistograma']
+        : ['grafGeneral', 'grafPromRet', 'grafTemas', 'grafPromedios'];
+      for (const id of idsGraficos) {
         const img = imagen(id);
         if (img) children.push(img);
       }
