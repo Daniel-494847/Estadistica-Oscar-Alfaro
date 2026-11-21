@@ -477,32 +477,24 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
             <option [value]="2">2 columnas</option>
           </select>
         </div>
+        @if (tipoGrafico() === 'pastel') {
+          <div class="col-12 col-sm-auto">
+            <label for="trimPastel" class="small text-muted me-2">Periodo</label>
+            <select id="trimPastel" class="form-select form-select-sm w-auto d-inline-block" [value]="trimPastel()" [disabled]="cargando()"
+                    (change)="cambiarTrimPastel(+$any($event.target).value)">
+              <option [value]="0">1º trimestre</option>
+              <option [value]="1">2º trimestre</option>
+              <option [value]="2">3º trimestre</option>
+              <option [value]="3">Promedio anual</option>
+            </select>
+          </div>
+        }
         <div class="col-12 col-sm-auto text-center">
           <span class="small text-muted">{{ cargando() ? 'Cargando datos...' : msg() }}</span>
         </div>
       </div>
 
-      @if (tipoGrafico() === 'pastel') {
-        <div class="row g-4"><div class="col-12"><div class="card h-100">
-          <div class="card-header fw-bold d-flex flex-wrap gap-2 align-items-center justify-content-between">
-            <span><i class="bi bi-pie-chart-fill me-2"></i>Distribución proporcional: promovidos y retenidos</span>
-            <span class="d-flex align-items-center gap-2">
-              <label for="trimPastel" class="small text-muted mb-0">Periodo</label>
-              <select id="trimPastel" class="form-select form-select-sm w-auto" [value]="trimPastel()" [disabled]="cargando()"
-                      (change)="cambiarTrimPastel(+$any($event.target).value)">
-                <option [value]="0">1º trimestre</option>
-                <option [value]="1">2º trimestre</option>
-                <option [value]="2">3º trimestre</option>
-                <option [value]="3">Promedio anual</option>
-              </select>
-            </span>
-          </div>
-          <div class="card-body py-2">
-            <div style="height:320px"><canvas id="grafPastel"></canvas></div>
-            <div class="small text-secondary mt-2" style="white-space: pre-line; line-height:1.25">{{ resumenPastel() }}</div>
-          </div>
-        </div></div></div>
-      } @else if (tipoGrafico() === 'histograma') {
+      @if (tipoGrafico() === 'histograma') {
         <div class="row g-4"><div class="col-12"><div class="card h-100">
           <div class="card-header fw-bold"><i class="bi bi-bar-chart-fill me-2"></i>Distribución de frecuencias del promedio por grado</div>
           <div class="card-body py-2">
@@ -513,20 +505,20 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
       } @else {
         <div class="row g-4">
           <div [class]="columnasGraficos() === 1 ? 'col-12' : 'col-12 col-lg-6'"><div class="card h-100">
-            <div class="card-header fw-bold">Generales por trimestre y promedio</div>
-            <div class="card-body py-2"><div style="height:320px"><canvas id="grafGeneral"></canvas></div></div>
+            <div class="card-header fw-bold">Generales por trimestre</div>
+            <div class="card-body py-2"><div [style.height.px]="columnasGraficos() === 1 ? 380 : 320"><canvas id="grafGeneral"></canvas></div></div>
           </div></div>
           <div [class]="columnasGraficos() === 1 ? 'col-12' : 'col-12 col-lg-6'"><div class="card h-100">
-            <div class="card-header fw-bold">Retenidos y aprobados + promedio</div>
-            <div class="card-body py-2"><div style="height:320px"><canvas id="grafPromRet"></canvas></div></div>
+            <div class="card-header fw-bold">Retenidos y aprobados</div>
+            <div class="card-body py-2"><div [style.height.px]="columnasGraficos() === 1 ? 380 : 320"><canvas id="grafPromRet"></canvas></div></div>
           </div></div>
           <div [class]="columnasGraficos() === 1 ? 'col-12' : 'col-12 col-lg-6'"><div class="card h-100">
-            <div class="card-header fw-bold">Temas programados y avanzados + promedio</div>
-            <div class="card-body py-2"><div style="height:320px"><canvas id="grafTemas"></canvas></div></div>
+            <div class="card-header fw-bold">Temas programados y avanzados</div>
+            <div class="card-body py-2"><div [style.height.px]="columnasGraficos() === 1 ? 380 : 320"><canvas id="grafTemas"></canvas></div></div>
           </div></div>
           <div [class]="columnasGraficos() === 1 ? 'col-12' : 'col-12 col-lg-6'"><div class="card h-100">
-            <div class="card-header fw-bold">Promedios + promedio anual</div>
-            <div class="card-body py-2"><div style="height:320px"><canvas id="grafPromedios"></canvas></div></div>
+            <div class="card-header fw-bold">Promedios</div>
+            <div class="card-body py-2"><div [style.height.px]="columnasGraficos() === 1 ? 380 : 320"><canvas id="grafPromedios"></canvas></div></div>
           </div></div>
         </div>
       }
@@ -1133,7 +1125,7 @@ export class AppComponent {
   cambiarColumnas(n: number) {
     if (n !== 1 && n !== 2) return;
     this.columnasGraficos.set(n as 1 | 2);
-    setTimeout(() => this.charts.forEach(c => c.resize()), 0);
+    setTimeout(() => this.charts.forEach(c => c.resize()), 30);
   }
 
   async abrirGraficos(recargarDatos = true) {
@@ -1180,6 +1172,8 @@ export class AppComponent {
         if (el) this.charts.push(new Chart(el, config));
       };
       const tipo = this.tipoGrafico();
+      const unaColumna = this.columnasGraficos() === 1;
+      Chart.defaults.font.size = unaColumna ? 11 : 10;
       const etiquetasChart = tipo === 'barras'
         ? ['1º TRIMESTRE', '2º TRIMESTRE', '3º TRIMESTRE', 'PROMEDIO ANUAL']
         : ['1º TRIM', '2º TRIM', '3º TRIM', 'PROMEDIO ANUAL'];
@@ -1198,7 +1192,7 @@ export class AppComponent {
           // Espacio reservado para dibujar el resumen alineado con cada categoría.
           layout: tipo === 'barras'
             ? { padding: { left: 120, right: 8, top: 4, bottom: 4 } }
-            : { padding: { bottom: 82, top: 4 } },
+            : { padding: { bottom: unaColumna ? 100 : 82, top: 4 } },
         };
         if (esPunto) {
           base.scales = {
@@ -1280,21 +1274,27 @@ export class AppComponent {
           id: 'resumenCanvas',
           afterDraw: (chart: any) => {
             const ctx = chart.ctx;
+            // En una columna el canvas es más ancho: el texto crece, pero se limita en móviles.
+            const factor = Math.min(1.3, Math.max(0.8, chart.width / (unaColumna ? 900 : 560)));
+            const tamTitulo = Math.round((unaColumna ? 12 : 9) * factor);
+            const tamLinea = Math.round((unaColumna ? 11 : 9) * factor);
+            const salto = tamLinea + 4;
+            const inferior = (chart.options.layout?.padding as any)?.bottom ?? 82;
             ctx.save();
             ctx.textBaseline = 'top';
             (esPunto ? bloques.slice(0, 3) : bloques).forEach((bloque, i) => {
               const x = tipo === 'barras'
                 ? chart.chartArea.left - 10
+                : tipo === 'pastel' ? chart.width * (i + 0.5) / 4
                 : esPunto ? chart.scales.x.getPixelForValue(i + 1) : chart.scales.x.getPixelForValue(i);
-              const inferior = (chart.options.layout?.padding as any)?.bottom ?? 82;
               const y = tipo === 'barras'
-                ? chart.scales.y.getPixelForValue(i) - 15
+                ? chart.scales.y.getPixelForValue(i) - (tamTitulo + 4)
                 : chart.height - inferior + 2;
               ctx.textAlign = tipo === 'barras' ? 'right' : 'center';
-              ctx.font = 'bold 9px Arial'; ctx.fillStyle = '#212529';
+              ctx.font = `bold ${tamTitulo}px Arial`; ctx.fillStyle = '#212529';
               ctx.fillText(bloque.titulo, x, y);
-              ctx.font = '9px Arial'; ctx.fillStyle = '#6c757d';
-              bloque.lineas.forEach((linea, j) => ctx.fillText(linea, x, y + 12 + j * 11));
+              ctx.font = `${tamLinea}px Arial`; ctx.fillStyle = '#6c757d';
+              bloque.lineas.forEach((linea, j) => ctx.fillText(linea, x, y + tamTitulo + 3 + j * salto));
             });
             ctx.restore();
           },
@@ -1318,24 +1318,38 @@ export class AppComponent {
       const rootType = esPunto ? 'scatter' : (esBarra || esCombo ? 'bar' : 'line');
 
       if (tipo === 'pastel') {
-        // Solo se usa cuando las partes suman el 100%: promovidos + retenidos.
+        // Los cuatro gráficos se muestran como pastel del periodo elegido, con partes que suman 100%.
         const i = this.trimPastel();
-        const periodo = i === 3 ? 'PROMEDIO ANUAL' : `${i + 1}º TRIMESTRE`;
-        // Se calcula sobre cantidades, no sobre la media de porcentajes: así las dos partes siempre suman 100%.
+        const crearPastel = (id: string, etiquetasPie: string[], valores: number[], colores: string[], resumen: string) =>
+          crear(id, {
+            type: 'pie',
+            plugins: [etiquetasArco(v => `${Math.round(v)}%`), resumenCanvas(resumen)],
+            data: { labels: etiquetasPie, datasets: [{
+              data: valores, backgroundColor: colores, borderColor: '#fff', borderWidth: 2,
+            }] },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              layout: { padding: { bottom: unaColumna ? 100 : 82, top: 4 } },
+              plugins: { legend: { position: 'bottom' as const } },
+            },
+          });
         const totalEst = paprob[i] + pret[i];
         const promPie = totalEst > 0 ? +(paprob[i] / totalEst * 100).toFixed(2) : 0;
         const retPie = totalEst > 0 ? +(pret[i] / totalEst * 100).toFixed(2) : 0;
-        this.resumenPastel.set(totalEst > 0
-          ? `${periodo}\nPromovidos ${Math.round(promPie)}% · Retenidos ${Math.round(retPie)}% del total de estudiantes.\nAmbas partes suman 100%.`
-          : `${periodo}\nSin datos registrados para este periodo.`);
-        crear('grafPastel', {
-          type: 'pie',
-          plugins: [etiquetasArco(v => `${Math.round(v)}%`)],
-          data: { labels: ['Promovidos', 'Retenidos'], datasets: [{
-            data: [promPie, retPie], backgroundColor: ['#198754', '#dc3545'], borderColor: '#fff', borderWidth: 2,
-          }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' as const } } },
-        });
+        const avanz = tpct[i];
+        const totalTemas = tprog[i];
+        const avanzTemas = tavanz[i];
+        const pendTemas = Math.max(0, totalTemas - avanzTemas);
+        const promedioPie = pro[i];
+
+        crearPastel('grafGeneral', ['Avanzados', 'No avanzados'], [avanz, +(100 - avanz).toFixed(2)],
+          ['#0d6efd', '#cfe2ff'], this.resumenGeneral());
+        crearPastel('grafPromRet', ['Promovidos', 'Retenidos'], [promPie, retPie],
+          ['#198754', '#dc3545'], this.resumenPromRet());
+        crearPastel('grafTemas', ['Avanzados', 'Pendientes'], [avanzTemas, pendTemas],
+          ['#6610f2', '#e5dcfb'], this.resumenTemas());
+        crearPastel('grafPromedios', ['Promedio', 'Complemento'], [promedioPie, +(100 - promedioPie).toFixed(2)],
+          ['#fd7e14', '#ffe5cc'], this.resumenPromedio());
       } else if (tipo === 'histograma') {
         // Frecuencias de los promedios por grado, agrupados en rangos de 10 puntos.
         const notas: number[] = (this.agregados.filas ?? []).flatMap((f: any) =>
@@ -1493,8 +1507,8 @@ export class AppComponent {
           GRADOS.map((g, k) => [g, d(filas.promedio[k]['prom'], 2)]), [50, 50]),
         titulo('5. Gráficos comparativos de los tres trimestres'),
       ];
-      const idsGraficos = this.tipoGrafico() === 'pastel' ? ['grafPastel']
-        : this.tipoGrafico() === 'histograma' ? ['grafHistograma']
+      const idsGraficos = this.tipoGrafico() === 'histograma'
+        ? ['grafHistograma']
         : ['grafGeneral', 'grafPromRet', 'grafTemas', 'grafPromedios'];
       for (const id of idsGraficos) {
         const img = imagen(id);
