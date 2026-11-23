@@ -1,5 +1,5 @@
 import { Component, ViewEncapsulation, computed, signal } from '@angular/core';
-import { AREAS_POR_DEFECTO, Area, CAMPOS_NOMBRES, GRADOS, TRIMESTRES, Col, Fila, Tipo, calcular, definir, gid, lineas, totales } from './config';
+import { AREAS_POR_DEFECTO, Area, CAMPOS_NOMBRES, GRADOS, REPROBADOS_KEY, TRIMESTRES, Col, Fila, Reprobado, Tipo, calcular, definir, gid, lineas, reprobadosDe, totales } from './config';
 import { AuthService } from './auth.service';
 import { ExportService } from './export.service';
 import { COLECCION_DEFECTO, Colegio, FirebaseService, IDS_CUADRO, SLUG_DEFECTO } from './firebase.service';
@@ -13,7 +13,7 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
   standalone: true,
   encapsulation: ViewEncapsulation.None, // para que @page y los estilos de impresión funcionen
   template: `
-  <div class="container py-3 no-print" [class.app-panel]="vista() !== 'menu'">
+  <div class="container py-3 no-print" [class.app-panel]="vista() !== 'menu'" [class.form-full]="vista() === 'form'">
     <!-- Acceso administrador: botón pequeño siempre visible arriba a la izquierda -->
     <div class="d-flex justify-content-start align-items-center flex-wrap gap-2 mb-2 no-print">
       @if (admin()) {
@@ -36,6 +36,18 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
         <span class="badge text-bg-light border small shadow-sm">{{ nombreUE() }}</span>
       }
     </div>
+
+    <!-- Ventana flotante de confirmación al guardar -->
+    @if (modalGuardado()) {
+      <div class="modal-guardado no-print" role="status" aria-live="polite">
+        <div class="modal-guardado__card shadow-lg">
+          <div class="modal-guardado__icon"><i class="bi bi-check-circle-fill"></i></div>
+          <div class="fw-bold fs-5">¡Guardado!</div>
+          <div class="small text-muted">Los datos fueron guardados exitosamente.</div>
+          <button type="button" class="btn btn-success btn-sm mt-3 px-4" (click)="cerrarModalGuardado()">Aceptar</button>
+        </div>
+      </div>
+    }
 
     <!-- Aviso flotante de guardado (1,5 s y desaparece) -->
     @if (toast()) {
@@ -353,6 +365,65 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
         </tbody>
       </table></div>
 
+      @if (tipo() === 'promret') {
+        <div class="card mt-3">
+          <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="fw-bold"><i class="bi bi-person-x-fill me-2"></i>Registro de estudiantes reprobados · {{ grado() }}</div>
+            <span class="badge text-bg-secondary">{{ reprobados().length }} registro(s)</span>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted mb-2">
+              Registre una fila por estudiante y escriba la nota solo en el área o áreas que reprobó;
+              deje en blanco las áreas que aprobó.
+            </p>
+            <div class="table-responsive reprobados-responsive">
+              <table class="table table-sm table-bordered align-middle mb-2 reprobados-table">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width:44px">N°</th>
+                    <th class="nombre-col">Apellidos y nombres</th>
+                    @for (a of areasVisibles(); track a[0]) { <th class="area-col" [title]="a[1]">{{ a[1] }}</th> }
+                    <th style="width:44px"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of reprobados(); track r.id; let i = $index) {
+                    <tr>
+                      <td class="text-center">{{ i + 1 }}</td>
+                      <td>
+                        <input class="form-control form-control-sm" [value]="r.nombre" [disabled]="trimBloqueado()"
+                               (input)="setReprobado(i, 'nombre', $any($event.target).value)"
+                               placeholder="Ej. Pérez López, Juan Carlos">
+                      </td>
+                      @for (a of areasVisibles(); track a[0]) {
+                        <td>
+                          <input type="number" min="0" max="100" class="form-control form-control-sm text-center"
+                                 [class.is-invalid]="notaInvalida(r.notas[a[0]] ?? '')" [value]="r.notas[a[0]] ?? ''"
+                                 [disabled]="trimBloqueado()" (input)="setReprobado(i, a[0], $any($event.target).value)"
+                                 (wheel)="bloquearScroll($event)" [title]="a[1]">
+                        </td>
+                      }
+                      <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-danger" [disabled]="trimBloqueado()"
+                                (click)="quitarReprobado(i)" title="Quitar fila"><i class="bi bi-trash3"></i></button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td [attr.colspan]="areasVisibles().length + 3" class="text-center text-muted py-3">No hay estudiantes reprobados registrados en este grado.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <button type="button" class="btn btn-sm btn-outline-primary" [disabled]="trimBloqueado()" (click)="agregarReprobado()">
+                <i class="bi bi-plus-lg me-1"></i>Agregar estudiante
+              </button>
+              <span class="small text-muted">Los cambios se guardan con el botón «Guardar Registro».</span>
+            </div>
+          </div>
+        </div>
+      }
+
       @if (tipo() === 'promedio') {
         <div class="row g-2 g-md-3 mb-3">
           <div class="col-12 col-md-6"><div class="card card-body"><small class="fw-bold text-secondary">PROMEDIO DE GRADO (automático)</small><div class="fs-4 fw-bold">{{ fila()['prom'] }}</div></div></div>
@@ -441,6 +512,45 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
         <input class="lugar" [value]="lugar()" (input)="lugar.set($any($event.target).value)">
       </div>
     </div>
+
+    <!-- Segunda hoja: registro nominal de reprobados, agrupado por grado -->
+    @if (tipo() === 'promret') {
+      <div class="hoja hoja-reprobados">
+        <div class="cab">
+          <img [src]="escudoUE()" alt="Escudo de la unidad educativa">
+          <div>
+            @for (l of titulosReprobados(); track $index) { <div [class.b]="$index === 0">{{ l }}</div> }
+          </div>
+          <img [src]="img.retrato" alt="">
+        </div>
+        <table class="cuadro reprobados">
+          <thead>
+            <tr>
+              <th>N°</th><th class="nombre">APELLIDOS Y NOMBRES</th>
+              @for (a of areasVisibles(); track a[0]) { <th class="rot-area">{{ a[1] }}</th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (g of reprobadosPorGrado(); track g.grado) {
+              <tr class="grado-fila"><th [attr.colspan]="areasVisibles().length + 2">GRADO {{ g.grado }}</th></tr>
+              @for (r of g.filas; track r.id; let i = $index) {
+                <tr>
+                  <td>{{ i + 1 }}</td>
+                  <td class="nombre">{{ r.nombre }}</td>
+                  @for (a of areasVisibles(); track a[0]) { <td>{{ r.notas[a[0]] ?? '' }}</td> }
+                </tr>
+              }
+            } @empty {
+              <tr><td [attr.colspan]="areasVisibles().length + 2">Sin estudiantes reprobados registrados en este trimestre.</td></tr>
+            }
+          </tbody>
+        </table>
+        <div class="pie">
+          <div>Total de registros: <b class="caja">{{ totalReprobados() }}</b></div>
+          <input class="lugar" [value]="lugar()" (input)="lugar.set($any($event.target).value)">
+        </div>
+      </div>
+    }
   }
 
   <!-- 4. GRÁFICOS ESTADÍSTICOS DE LA UNIDAD EDUCATIVA -->
@@ -592,6 +702,27 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
     input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     @keyframes toast-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     .toast-guardado { animation: toast-in .2s ease-out; }
+    .modal-guardado { position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center;
+      background: rgba(2,12,27,.38); backdrop-filter: blur(2px); padding: 1rem; }
+    .modal-guardado__card { background: #fff; border-radius: 18px; padding: 1.5rem 2rem; min-width: 270px; text-align: center;
+      border: 1px solid rgba(255,255,255,.7); animation: toast-in .2s ease-out; }
+    .modal-guardado__icon { font-size: 2.75rem; line-height: 1; color: #198754; margin-bottom: .5rem; }
+    /* Encabezados de área en el registro de reprobados: texto pequeño y partido en líneas */
+    .area-col { min-width: 74px; max-width: 92px; padding: .35rem .25rem !important;
+      font-size: .66rem !important; line-height: 1.05; font-weight: 600; text-align: center;
+      vertical-align: bottom; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+    /* Formulario a todo el ancho y tabla ajustada para ver todas las columnas */
+    .form-full { max-width: none !important; }
+    .reprobados-table { table-layout: fixed; width: 100%; font-size: .8rem; }
+    .reprobados-table th, .reprobados-table td { padding: .25rem .2rem !important; vertical-align: middle; }
+    .reprobados-table .area-col { min-width: 0; max-width: none; font-size: .6rem !important; }
+    .reprobados-table .nombre-col { width: 190px; }
+    .reprobados-table input.form-control { padding: .2rem .3rem; font-size: .75rem; }
+    @media (max-width: 768px) {
+      .reprobados-table { min-width: 900px; }
+      .reprobados-table .area-col { min-width: 74px; }
+      .reprobados-table .nombre-col { min-width: 190px; }
+    }
     .hoja { max-width: 1250px; margin: 12px auto; padding: 8px; background: #fff; font-family: Cambria, serif; }
     .cab { display: flex; align-items: center; justify-content: space-between; text-align: center; margin-bottom: 8px; }
     .cab img { height: 64px; flex-shrink: 0; } .cab > div { min-width: 0; overflow-wrap: anywhere; } .cab .b { font-weight: bold; font-size: 12pt; }
@@ -608,6 +739,13 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
     .cuadro td.pc, .cuadro tr.tot td { font-weight: bold; } .cuadro tr.tot th, .cuadro tr.tot td { border-top: 3px double #000; }
     .pie { margin: 10px 0 0 40%; font-size: 10pt; } .caja { display: inline-block; min-width: 60px; text-align: center; border: 3px double #000; padding: 1px 6px; }
     .lugar { border: 0; background: transparent; font: inherit; font-weight: bold; width: 320px; margin-top: 6px; }
+    /* Segunda hoja: lista nominal de reprobados por grado */
+    .hoja + .hoja { margin-top: 24px; page-break-before: always; break-before: page; }
+    .cuadro.reprobados { table-layout: auto; font-size: 10pt; }
+    .cuadro.reprobados th, .cuadro.reprobados td { height: auto; padding: 3px 6px; }
+    .cuadro.reprobados tr.grado-fila th { background: #fff2cc; text-align: left; }
+    .cuadro.reprobados td.nombre, .cuadro.reprobados th.nombre { text-align: left; }
+    .cuadro.reprobados th.rot-area { font-size: 6pt; line-height: 1.05; width: 58px; }
     /* Fondo elegante aplicado a TODO el proyecto */
     body { margin: 0; min-height: 100vh; color: #0f172a;
       background-color: #06152b;
@@ -653,7 +791,7 @@ export class AppComponent {
   tipos: [Tipo, string, string, string][] = [
     ['temas', 'Temas Programados', 'Registro anual, programado y avanzado.', 'bi-journal-check'],
     ['promedio', 'Promedios', 'Gestión y registro de promedios por área.', 'bi-calculator'],
-    ['promret', 'Promovidos y Retenidos', 'Control de estudiantes promovidos y retenidos.', 'bi-person-check-fill'],
+    ['promret', 'Promovidos y Retenidos', 'Control de promovidos, retenidos y registro nominal de reprobados.', 'bi-person-check-fill'],
   ];
 
   vista = signal<'menu' | 'form' | 'previa' | 'graficos' | 'admin'>('menu');
@@ -670,6 +808,7 @@ export class AppComponent {
   datos = signal<Record<string, Fila | undefined>>({}); // todos los grados del cuadro abierto
   msg = signal(''); cargando = signal(false); guardado = signal(false);
   toast = signal(''); private toastTimer: any;
+  modalGuardado = signal(false); private modalGuardadoTimer: any;
   informeTrim = signal(1); generandoInforme = signal(false); informeMsg = signal('');
   pdfTipo = signal<Tipo>('temas'); pdfTrim = signal(0); pdfPreparado = signal(false); // 0 = todos los trimestres
   correo = signal(''); clave = signal(''); // formulario de acceso administrador
@@ -716,6 +855,19 @@ export class AppComponent {
   cabecera = computed(() => this.def().cols.slice(0, this.def().nArea));
   totCol = computed(() => this.def().total.find(c => c.key === 't_prom') as Col);
   totRetCol = computed(() => this.def().total.find(c => c.key === 't_ret') as Col);
+
+  // Registro nominal de reprobados del grado abierto y de todo el trimestre (para la segunda hoja)
+  reprobados = computed(() => reprobadosDe(this.cur()));
+  reprobadosPorGrado = computed(() => GRADOS
+    .map(g => ({ grado: g, filas: reprobadosDe(this.datos()[gid(g)]) }))
+    .filter(x => x.filas.length));
+  totalReprobados = computed(() => this.reprobadosPorGrado().reduce((s, g) => s + g.filas.length, 0));
+  titulosReprobados = computed(() => {
+    const titulos = lineas('promret', this.trim(), this.gestion(), this.nombreUE());
+    const ord = ['PRIMER', 'SEGUNDO', 'TERCER'][this.trim() - 1];
+    return [`REGISTRO DE ESTUDIANTES REPROBADOS POR GRADO · ${ord} TRIMESTRE GESTIÓN ${this.gestion()}`, ...titulos.slice(1)];
+  });
+  notaInvalida = (v: string) => v !== '' && (!isFinite(+v) || +v < 0 || +v > 100);
 
   nombreTipo = () => this.tipos.find(t => t[0] === this.tipo())![1];
   etiqueta = (t: number) => ({ temas: 'T. AVANZ', promedio: 'PROM', promret: 'PROM Y RET' }[this.tipo()]) + ` ${t}º TRIM`;
@@ -1621,6 +1773,39 @@ export class AppComponent {
     e.preventDefault();
     (e.target as HTMLElement).blur();
   }
+
+  private actualizarReprobados(fn: (actual: Reprobado[]) => Reprobado[]) {
+    if (this.trimBloqueado()) return;
+    const g = gid(this.grado());
+    this.datos.update(d => {
+      const fila = { ...(d[g] ?? {}) };
+      fila[REPROBADOS_KEY] = fn(reprobadosDe(fila));
+      return { ...d, [g]: fila };
+    });
+    this.guardado.set(false);
+  }
+
+  agregarReprobado() {
+    this.actualizarReprobados(rs => [...rs, {
+      id: `r${Date.now()}${Math.random().toString(36).slice(2, 7)}`,
+      nombre: '', notas: {},
+    }]);
+  }
+
+  quitarReprobado(i: number) {
+    this.actualizarReprobados(rs => rs.filter((_, k) => k !== i));
+  }
+
+  /** `clave` es 'nombre' o el id del área cuya nota se está escribiendo. */
+  setReprobado(i: number, clave: string, v: string) {
+    this.actualizarReprobados(rs => rs.map((r, k) => {
+      if (k !== i) return r;
+      return clave === 'nombre'
+        ? { ...r, nombre: v }
+        : { ...r, notas: { ...r.notas, [clave]: v } };
+    }));
+  }
+
   otro() { this.guardado.set(false); this.grado.set(this.grados[(this.grados.indexOf(this.grado()) + 1) % 12]); }
 
   private id = () => `${this.tipo()}_${this.trim()}`;
@@ -1650,8 +1835,26 @@ export class AppComponent {
     this.toastTimer = setTimeout(() => this.toast.set(''), 1500);
   }
 
+  private mostrarModalGuardado() {
+    clearTimeout(this.modalGuardadoTimer);
+    this.modalGuardado.set(true);
+    this.modalGuardadoTimer = setTimeout(() => this.modalGuardado.set(false), 3000);
+  }
+
+  cerrarModalGuardado() {
+    clearTimeout(this.modalGuardadoTimer);
+    this.modalGuardado.set(false);
+  }
+
   async guardar() {
     if (this.trimBloqueado()) { this.msg.set('La edición de este trimestre está bloqueada por el administrador'); return; }
+    if (this.tipo() === 'promret' && this.reprobados().some(r =>
+      !r.nombre.trim() ||
+      !Object.values(r.notas).some(v => v !== '') ||
+      Object.values(r.notas).some(v => this.notaInvalida(v)))) {
+      this.msg.set('Complete apellidos y nombres y al menos una nota válida (0-100) por estudiante reprobado.');
+      return;
+    }
     this.cargando.set(true);
     try {
       // En 2º y 3º no se guarda el anual: la fuente de verdad es el 1º trimestre
@@ -1661,8 +1864,12 @@ export class AppComponent {
         : this.cur();
       await this.fb.guardarGrado(this.id(), gid(this.grado()), fila, { gestion: this.gestion(), lugar: this.lugar() }, this.coleccion());
       this.guardado.set(true);
-      this.mostrarToast('Guardado exitosamente');
-    } catch { this.msg.set('No se pudo guardar (revisa la configuración de Firebase)'); }
+      this.mostrarModalGuardado();
+    } catch (e: any) {
+      console.error(e);
+      const detalle = e?.code === 'permission-denied' ? 'permisos de Firestore' : (e?.message ?? String(e));
+      this.msg.set('No se pudo guardar: ' + detalle);
+    }
     this.cargando.set(false);
   }
 
@@ -1700,46 +1907,54 @@ export class AppComponent {
   }
 
   private async generarPDF(libs: Awaited<ReturnType<AppComponent['cargarLibsPDF']>>, nombreArchivo: string) {
-    const hoja = document.querySelector<HTMLElement>('.hoja');
-    if (!hoja) throw new Error('No se encontró la vista previa');
-    // Se captura una copia con el ancho de escritorio para que en el celular
-    // el PDF conserve la misma proporción horizontal y no se divida en varias páginas.
-    const anchoEscritorio = 1250;
-    const copia = hoja.cloneNode(true) as HTMLElement;
-    copia.style.cssText = `position:fixed;left:-10000px;top:0;width:${anchoEscritorio}px;max-width:none;margin:0;padding:8px;background:#fff;z-index:-1;`;
-    const orig = hoja.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select');
-    const dest = copia.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select');
-    orig.forEach((el, i) => { if (dest[i]) dest[i].value = el.value; });
-    document.body.appendChild(copia);
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await Promise.all([...copia.querySelectorAll('img')].map(img => img.complete
-      ? Promise.resolve()
-      : new Promise(res => { img.onload = img.onerror = () => res(null); })));
-    let canvas: HTMLCanvasElement;
-    try {
-      canvas = await libs.html2canvas(copia, {
-        scale: 2, backgroundColor: '#ffffff', useCORS: true,
-        windowWidth: anchoEscritorio, windowHeight: Math.max(copia.scrollHeight, 800),
-      });
-    } finally {
-      copia.remove();
-    }
+    const hojas = [...document.querySelectorAll<HTMLElement>('.hoja')];
+    if (!hojas.length) throw new Error('No se encontró la vista previa');
     const pdf = new libs.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
     const margen = 8;
     const ancho = pdf.internal.pageSize.getWidth() - margen * 2;
     const altoPagina = pdf.internal.pageSize.getHeight() - margen * 2;
-    const altoParcela = Math.floor(canvas.width * altoPagina / ancho);
-    let y = 0, primera = true;
-    while (y < canvas.height) {
-      const alto = Math.min(altoParcela, canvas.height - y);
-      const parte = document.createElement('canvas');
-      parte.width = canvas.width; parte.height = alto;
-      const ctx = parte.getContext('2d')!;
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, parte.width, parte.height);
-      ctx.drawImage(canvas, 0, y, canvas.width, alto, 0, 0, canvas.width, alto);
-      if (!primera) pdf.addPage();
-      pdf.addImage(parte.toDataURL('image/png'), 'PNG', margen, margen, ancho, alto * ancho / canvas.width);
-      y += alto; primera = false;
+    let primera = true;
+
+    const agregar = (canvas: HTMLCanvasElement) => {
+      const altoParcela = Math.floor(canvas.width * altoPagina / ancho);
+      let y = 0;
+      while (y < canvas.height) {
+        const alto = Math.min(altoParcela, canvas.height - y);
+        const parte = document.createElement('canvas');
+        parte.width = canvas.width; parte.height = alto;
+        const ctx = parte.getContext('2d')!;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, parte.width, parte.height);
+        ctx.drawImage(canvas, 0, y, canvas.width, alto, 0, 0, canvas.width, alto);
+        if (!primera) pdf.addPage();
+        pdf.addImage(parte.toDataURL('image/png'), 'PNG', margen, margen, ancho, alto * ancho / canvas.width);
+        y += alto; primera = false;
+      }
+    };
+
+    for (const hoja of hojas) {
+      // Se captura una copia con el ancho de escritorio para que en el celular
+      // el PDF conserve la misma proporción horizontal y no se divida en varias páginas.
+      const anchoEscritorio = 1250;
+      const copia = hoja.cloneNode(true) as HTMLElement;
+      copia.style.cssText = `position:fixed;left:-10000px;top:0;width:${anchoEscritorio}px;max-width:none;margin:0;padding:8px;background:#fff;z-index:-1;`;
+      const orig = hoja.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select');
+      const dest = copia.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select');
+      orig.forEach((el, i) => { if (dest[i]) dest[i].value = el.value; });
+      document.body.appendChild(copia);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await Promise.all([...copia.querySelectorAll('img')].map(img => img.complete
+        ? Promise.resolve()
+        : new Promise(res => { img.onload = img.onerror = () => res(null); })));
+      let canvas: HTMLCanvasElement;
+      try {
+        canvas = await libs.html2canvas(copia, {
+          scale: 2, backgroundColor: '#ffffff', useCORS: true,
+          windowWidth: anchoEscritorio, windowHeight: Math.max(copia.scrollHeight, 800),
+        });
+      } finally {
+        copia.remove();
+      }
+      agregar(canvas);
     }
     pdf.save(nombreArchivo);
   }

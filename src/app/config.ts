@@ -13,6 +13,49 @@ export interface Col {
 /** Área de aprendizaje: id estable (clave en Firestore), nombre y grupo al que pertenece. */
 export interface Area { id: string; nombre: string; campo: string }
 
+/** Registro nominal de un estudiante reprobado: una fila por estudiante, nota por área. */
+export interface Reprobado {
+  id: string;
+  nombre: string;                 // apellidos y nombres
+  notas: Record<string, string>;  // id del área -> nota (vacío si no reprobó esa área)
+}
+
+/** Campo donde se guarda la lista dentro de la fila de cada grado (documento promret_*). */
+export const REPROBADOS_KEY = '_reprobados';
+
+/**
+ * Normaliza la lista guardada. El formato actual es una fila por estudiante con `notas`.
+ * También migra el formato anterior (una fila por área) agrupando las áreas del mismo alumno.
+ */
+export function reprobadosDe(f: Fila | undefined): Reprobado[] {
+  const v = f?.[REPROBADOS_KEY];
+  if (!Array.isArray(v)) return [];
+  const porNombre = new Map<string, Reprobado>();
+  v.forEach((r: any, i: number) => {
+    if (!r || typeof r !== 'object') return;
+    const nombre = String(r.nombre ?? '').trim();
+    // El formato nuevo distingue alumnos por id (puede haber nombres repetidos);
+    // el antiguo se agrupa por nombre para juntar las áreas de un mismo alumno.
+    const esNuevo = !!r.notas && typeof r.notas === 'object';
+    const clave = esNuevo ? `id:${r.id ?? i}` : (nombre || `__sin_nombre_${i}`);
+    let destino = porNombre.get(clave);
+    if (!destino) {
+      destino = { id: String(r.id ?? `r${i}`), nombre, notas: {} };
+      porNombre.set(clave, destino);
+    }
+    if (r.notas && typeof r.notas === 'object') {
+      for (const [area, nota] of Object.entries(r.notas)) {
+        const valor = String(nota ?? '');
+        if (valor !== '') destino.notas[area] = valor;
+      }
+    } else if (r.area) {
+      const valor = String(r.nota ?? '');
+      if (valor !== '') destino.notas[String(r.area)] = valor;
+    }
+  });
+  return [...porNombre.values()];
+}
+
 export const GRADOS = ['1ºA','1ºB','2ºA','2ºB','3ºA','3ºB','4ºA','4ºB','5ºA','5ºB','6ºA','6ºB'];
 export const TRIMESTRES = [1, 2, 3]; // los tres trimestres están habilitados
 export const gid = (g: string) => g.replace('º', ''); // id limpio para Firestore

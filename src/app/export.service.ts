@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { AREAS_POR_DEFECTO, Area, GRADOS, Tipo, calcular, definir, gid, lineas, totales } from './config';
+import { AREAS_POR_DEFECTO, Area, GRADOS, Tipo, calcular, definir, gid, lineas, reprobadosDe, totales } from './config';
 
 type Doc = { datos?: Record<string, any>; gestion?: string; lugar?: string } | null | undefined;
 
@@ -30,6 +30,16 @@ const S: Record<string, any> = {
 };
 
 interface Celda { v: string | number; s: any }
+
+interface Matriz {
+  titulos: string[];
+  mat: Celda[][];
+  merges: { s: { r: number; c: number }; e: { r: number; c: number } }[];
+  ancho: number;
+  pie: string[];
+  anchos: number[];
+  alturas: number[];
+}
 
 // Dibujo minimalista para incrustar el escudo en cada hoja del Excel.
 const DIBUJO = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -138,8 +148,71 @@ export class ExportService {
     return { titulos, mat, merges, ancho, pie, anchos, alturas };
   }
 
-  private hoja(XLSX: any, tipo: Tipo, t: number, d: Doc, nombre: string, areas?: Area[], ue?: string) {
-    const m = this.matriz(tipo, t, d, areas, ue);
+  /** Segunda hoja del cuadro de promovidos/retenidos: una fila por estudiante y una columna por área. */
+  private matrizReprobados(t: number, d: Doc, areas: Area[] = AREAS_POR_DEFECTO, ue?: string): Matriz {
+    const gestion = d?.gestion ?? '2026';
+    const ord = ['PRIMER', 'SEGUNDO', 'TERCER'][t - 1];
+    const base = lineas('promret', t, gestion, ue);
+    const titulos = [`REGISTRO DE ESTUDIANTES REPROBADOS POR GRADO · ${ord} TRIMESTRE GESTIÓN ${gestion}`, ...base.slice(1)];
+    const ids = areas.map(a => a.id);
+    const ancho = ids.length + 2; // N°, estudiante y una columna por área
+    const cabecera = {
+      ...S.celda,
+      font: { ...S.celda.font, bold: true },
+      alignment: { horizontal: 'center' as const, vertical: 'center' as const, wrapText: true },
+    };
+    const izquierda = { ...S.celda, alignment: { horizontal: 'left' as const, vertical: 'center' as const } };
+    const seccion = { ...S.grupo, alignment: { horizontal: 'left' as const, vertical: 'center' as const } };
+
+    const mat: Celda[][] = [[
+      this.celda('N°', cabecera),
+      this.celda('APELLIDOS Y NOMBRES', cabecera),
+      ...areas.map(a => this.celda(a.nombre, cabecera)),
+    ]];
+    const merges: Matriz['merges'] = [];
+    const alturas: number[] = [40];
+    const grados = GRADOS
+      .map(g => ({ g, filas: reprobadosDe(d?.datos?.[gid(g)]) }))
+      .filter(x => x.filas.length);
+
+    for (const { g, filas } of grados) {
+      const r = mat.length;
+      mat.push([this.celda(`GRADO ${g}`, seccion), ...Array.from({ length: ancho - 1 }, () => this.celda('', seccion))]);
+      merges.push({ s: { r, c: 0 }, e: { r, c: ancho - 1 } });
+      alturas.push(20);
+      for (const f of filas) {
+        mat.push([
+          this.celda('', S.celda),
+          this.celda(f.nombre, izquierda),
+          ...ids.map(id => this.celda(f.notas[id] ?? '', S.celda)),
+        ]);
+        alturas.push(18);
+      }
+    }
+
+    if (!grados.length) {
+      const r = mat.length;
+      mat.push([this.celda('Sin estudiantes reprobados registrados en este trimestre.', S.celda),
+        ...Array.from({ length: ancho - 1 }, () => this.celda('', S.celda))]);
+      merges.push({ s: { r, c: 0 }, e: { r, c: ancho - 1 } });
+      alturas.push(20);
+    }
+
+    const ultima = mat.length - 1;
+    mat[0].forEach((_, c) => { mat[0][c] = { ...mat[0][c], s: borde(mat[0][c].s, { top: DOBLE }) }; });
+    mat.forEach((fila, r) => {
+      fila[0] = { ...fila[0], s: borde(fila[0].s, { left: DOBLE }) };
+      fila[ancho - 1] = { ...fila[ancho - 1], s: borde(fila[ancho - 1].s, { right: DOBLE }) };
+      if (r === ultima) fila.forEach((_, c) => { fila[c] = { ...fila[c], s: borde(fila[c].s, { bottom: DOBLE }) }; });
+    });
+
+    const pie = d?.lugar ? [d.lugar] : [];
+    if (pie.length) alturas.push(20);
+    return { titulos, mat, merges, ancho, pie, anchos: [8, 46, ...areas.map(() => 14)], alturas };
+  }
+
+  private hoja(XLSX: any, tipo: Tipo, t: number, d: Doc, nombre: string, areas?: Area[], ue?: string, matriz?: Matriz) {
+    const m = matriz ?? this.matriz(tipo, t, d, areas, ue);
     const filas: any[][] = [];
     const merges: any[] = [];
 
@@ -246,6 +319,11 @@ export class ExportService {
         const nombre = `${nombres[tp]} ${t}º TRIM`;
         const d = await leer(`${tp}_${t}`).catch(() => null);
         XLSX.utils.book_append_sheet(wb, this.hoja(XLSX, tp, t, d, nombre, areas, ue), nombre);
+        if (tp === 'promret') {
+          const nombreR = `REPROBADOS ${t}º TRIM`;
+          const hojaR = this.hoja(XLSX, tp, t, d, nombreR, areas, ue, this.matrizReprobados(t, d, areas, ue));
+          XLSX.utils.book_append_sheet(wb, hojaR, nombreR);
+        }
       }
     }
     this.guardar(XLSX, wb, 'registro-estadistico.xlsx', escudo);
@@ -256,6 +334,11 @@ export class ExportService {
     const wb = XLSX.utils.book_new();
     const nombre = `${tipo} ${t}º TRIM`;
     XLSX.utils.book_append_sheet(wb, this.hoja(XLSX, tipo, t, d, nombre, areas, ue), nombre);
+    if (tipo === 'promret') {
+      const nombreR = `REPROBADOS ${t}º TRIM`;
+      const hojaR = this.hoja(XLSX, tipo, t, d, nombreR, areas, ue, this.matrizReprobados(t, d, areas, ue));
+      XLSX.utils.book_append_sheet(wb, hojaR, nombreR);
+    }
     this.guardar(XLSX, wb, `cuadros-${tipo}-${t}trim.xlsx`, escudo);
   }
 }

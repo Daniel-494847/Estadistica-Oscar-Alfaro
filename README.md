@@ -57,6 +57,11 @@ El icono que se muestra al compartir el enlace está en `src/icono.png` (512×51
   automáticamente en 2º y 3º trimestre para el mismo grado y área (se guarda en los 3 documentos).
 - En **Promovidos y Retenidos**, **ESTUDIANTES EFECTIVOS** escrito en 1º trimestre se replica en
   los tres trimestres para el mismo grado, pero **puede modificarse** libremente en 2º y 3º.
+- En **Promovidos y Retenidos** hay un registro nominal de **estudiantes reprobados** por grado:
+  **una fila por estudiante** y **una columna por cada área de aprendizaje**, con la nota (0-100)
+  solo en las áreas que reprobó. Se guarda en `_reprobados` dentro de la fila de cada grado del
+  documento `promret_<trimestre>`, con el mismo botón **Guardar Registro** y el mismo bloqueo por
+  trimestre. Los registros antiguos de una fila por área se agrupan automáticamente al abrir el cuadro.
 
 > Firestore no requiere crear colecciones manualmente: se crean al escribir el primer documento. Para inicializar o verificar la estructura se usan los scripts de abajo.
 
@@ -100,7 +105,8 @@ El icono que se muestra al compartir el enlace está en `src/icono.png` (512×51
 - **Fondo global y responsividad**: degradado moderno, textura de cuadrícula y brillos laterales aplicados a **todo el proyecto**. El menú usa un panel de cristal y los formularios un panel claro sobre ese fondo. En celular, selectores, tarjetas y botones usan columnas Bootstrap de ancho completo (`col-12`) y las tablas anchas se desplazan dentro de `.table-responsive` con la primera columna fija; el cuerpo de la página nunca sale del ancho del dispositivo. Los documentos generados conservan su diseño original.
 - **Menú → Descargar Excel**: genera `registro-estadistico.xlsx` con 9 hojas (3 cuadros × 3 trimestres), con el mismo formato de la vista previa: títulos, encabezados combinados, texto vertical, bordes dobles, tipografía Cambria y configuración de impresión en papel Carta apaisado ajustado al ancho. El tamaño Carta (`paperSize=1`), la orientación apaisada, el ajuste al ancho y el centrado horizontal ya vienen listos en cada hoja; no hay que configurarlos al imprimir.
 - **Menú → Descargar PDF**: permite elegir el **cuadro** (Temas, Promedios o Promovidos/Retenidos) y el **trimestre**. El botón abre la vista previa; **no descarga nada automáticamente**. En la vista previa, el usuario debe presionar **⬇ PDF** para el trimestre mostrado o **Descargar los 3 PDF** cuando eligió *Todos (3 archivos)*. Se generan `cuadros-<cuadro>-1trim.pdf`, `-2trim.pdf` y `-3trim.pdf` en papel Carta apaisado, capturando la vista previa tal como se ve en pantalla.
-- **Vista previa**: botones para descargar el Excel o el PDF **del cuadro abierto**, además de Imprimir.
+- **Vista previa**: botones para descargar el Excel o el PDF **del cuadro abierto**, además de Imprimir. En *Promovidos y Retenidos* se agrega una **segunda hoja** con el registro de reprobados agrupado por grado; esa hoja también se incluye en el PDF y en la impresión.
+- **Excel**: en cada trimestre de *Promovidos y Retenidos*, inmediatamente después de la hoja del cuadro, se genera la hoja `REPROBADOS <t>º TRIM` con el listado separado por grados y una columna por área (la descarga general pasa a tener 12 hojas; la de un solo cuadro, 2).
 
 El PDF se genera con `html2canvas` + `jspdf`; el Excel con `xlsx-js-style` y `fflate` para aplicar la configuración de impresión. Las librerías se cargan bajo demanda para no aumentar el bundle inicial.
 
