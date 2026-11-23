@@ -364,7 +364,8 @@ export class ExportService {
   }
 
   async exportarExcelTodo(leer: (id: string) => Promise<any>, areas?: Area[], ue?: string, escudo?: string, icono?: string) {
-    const XLSX = await import('xlsx-js-style');
+    const modulo: any = await import('xlsx-js-style');
+    const XLSX: any = modulo.default ?? modulo; // bundle ESM: el CJS queda en default
     const wb = XLSX.utils.book_new();
     const nombres: Record<string, string> = { temas: 'T. AVANZ', promret: 'PROM Y RET', promedio: 'PROM' };
     for (const tp of ['temas', 'promret', 'promedio'] as Tipo[]) {
@@ -383,7 +384,8 @@ export class ExportService {
   }
 
   async exportarExcelUno(tipo: Tipo, t: number, d: Doc, areas?: Area[], ue?: string, escudo?: string, icono?: string) {
-    const XLSX = await import('xlsx-js-style');
+    const modulo: any = await import('xlsx-js-style');
+    const XLSX: any = modulo.default ?? modulo; // bundle ESM: el CJS queda en default
     const wb = XLSX.utils.book_new();
     const nombre = `${tipo} ${t}º TRIM`;
     XLSX.utils.book_append_sheet(wb, this.hoja(XLSX, tipo, t, d, nombre, areas, ue), nombre);
