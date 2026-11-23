@@ -398,7 +398,7 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
                       @for (a of areasVisibles(); track a[0]) {
                         <td>
                           <input type="number" min="0" max="100" class="form-control form-control-sm text-center"
-                                 [class.is-invalid]="notaInvalida(r.notas[a[0]] ?? '')" [value]="r.notas[a[0]] ?? ''"
+                                 [class.is-invalid]="notaInvalida(r.notas[a[0]])" [value]="r.notas[a[0]]"
                                  [disabled]="trimBloqueado()" (input)="setReprobado(i, a[0], $any($event.target).value)"
                                  (wheel)="bloquearScroll($event)" [title]="a[1]">
                         </td>
@@ -537,7 +537,7 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
                 <tr>
                   <td>{{ i + 1 }}</td>
                   <td class="nombre">{{ r.nombre }}</td>
-                  @for (a of areasVisibles(); track a[0]) { <td>{{ r.notas[a[0]] ?? '' }}</td> }
+                  @for (a of areasVisibles(); track a[0]) { <td>{{ r.notas[a[0]] }}</td> }
                 </tr>
               }
             } @empty {
@@ -867,7 +867,10 @@ export class AppComponent {
     const ord = ['PRIMER', 'SEGUNDO', 'TERCER'][this.trim() - 1];
     return [`REGISTRO DE ESTUDIANTES REPROBADOS POR GRADO · ${ord} TRIMESTRE GESTIÓN ${this.gestion()}`, ...titulos.slice(1)];
   });
-  notaInvalida = (v: string) => v !== '' && (!isFinite(+v) || +v < 0 || +v > 100);
+  notaInvalida = (v?: string | null) => {
+    const s = v ?? '';
+    return s !== '' && (!isFinite(+s) || +s < 0 || +s > 100);
+  };
 
   nombreTipo = () => this.tipos.find(t => t[0] === this.tipo())![1];
   etiqueta = (t: number) => ({ temas: 'T. AVANZ', promedio: 'PROM', promret: 'PROM Y RET' }[this.tipo()]) + ` ${t}º TRIM`;
