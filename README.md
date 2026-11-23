@@ -63,7 +63,8 @@ La imagen que se muestra al compartir el enlace es `src/iconolink.png` (180×180
 - Registro global de unidades y escudos en `reportes-academicos/_registro`.
 - Las rutas antiguas (`cuadros/<id>`, `config/colegios`) se leen como respaldo y se copian perezosamente a la estructura nueva; no se escriben.
 - Datos reales importados y verificados desde `scripts/datos-iniciales.json`
-  (1º y 2º trimestre con datos; 3º trimestre vacío a la espera de carga).
+  (1º y 2º trimestre con datos; 3º trimestre con `T.PROG. ANUAL` replicado y pendiente de
+  programación/avance).
 - Los 12 grados están presentes en los 6 documentos con datos (incluido `1A` en `temas_1`).
 - Al abrir un cuadro o cambiar de trimestre, la app selecciona automáticamente el primer grado
   con datos y avisa si el grado actual está vacío.
@@ -78,6 +79,9 @@ La imagen que se muestra al compartir el enlace es `src/iconolink.png` (180×180
   solo en las áreas que reprobó. Se guarda en `_reprobados` dentro de la fila de cada grado del
   documento `promret_<trimestre>` de `promovidos-retenidos`, con el mismo botón **Guardar Registro** y el mismo bloqueo por
   trimestre. Los registros antiguos de una fila por área se agrupan automáticamente al abrir el cuadro.
+- Si se actualiza la página (F5 / botón **Actualizar**) mientras está abierto un formulario, la URL mantiene
+  `#/form/<cuadro>/<trimestre>/<grado>` y la app vuelve a ese mismo cuadro, trimestre y grado. El botón
+  **⟳ Cargar Datos** solo recarga los datos de Firestore sin regresar al menú.
 
 > Firestore no requiere crear colecciones manualmente: se crean al escribir el primer documento. Para inicializar o verificar la estructura se usan los scripts de abajo.
 
@@ -119,17 +123,17 @@ La imagen que se muestra al compartir el enlace es `src/iconolink.png` (180×180
 ## Descargas
 
 - **Fondo global y responsividad**: degradado moderno, textura de cuadrícula y brillos laterales aplicados a **todo el proyecto**. El menú usa un panel de cristal y los formularios un panel claro sobre ese fondo. En celular, selectores, tarjetas y botones usan columnas Bootstrap de ancho completo (`col-12`) y las tablas anchas se desplazan dentro de `.table-responsive` con la primera columna fija; el cuerpo de la página nunca sale del ancho del dispositivo. Los documentos generados conservan su diseño original.
-- **Menú → Descargar Excel**: genera `registro-estadistico.xlsx` con 12 hojas (9 cuadros + 3 de reprobados), con el mismo formato de la vista previa: títulos, encabezados combinados, texto vertical, bordes dobles, tipografía Cambria y configuración de impresión en papel Carta apaisado ajustado al ancho. Las dos imágenes del encabezado (escudo de la U.E. e icono) se incrustan en cada hoja; el icono se convierte a PNG para que Excel y el PDF lo muestren siempre. El tamaño Carta (`paperSize=1`), la orientación apaisada, el ajuste al ancho y el centrado horizontal ya vienen listos en cada hoja; no hay que configurarlos al imprimir.
+- **Menú → Descargar Excel**: genera `registro-estadistico.xlsx` con 12 hojas (9 cuadros + 3 de reprobados), con el mismo formato de la vista previa: títulos, encabezados combinados, texto vertical, bordes dobles, tipografía Cambria y configuración de impresión en papel Carta apaisado. Las dos imágenes del encabezado (escudo de la U.E. e icono) se incrustan en cada hoja; el icono se convierte a PNG para que Excel y el PDF lo muestren siempre. Cada hoja trae listo el tamaño Carta (`paperSize=1`), `orientation="landscape"`, `fitToPage="1"`, `fitToWidth="1"`, **`fitToHeight="1"`** (una sola página) y centrado horizontal; no hay que configurarlos al imprimir.
 - **Menú → Descargar PDF**: permite elegir el **cuadro** (Temas, Promedios o Promovidos/Retenidos) y el **trimestre**. El botón abre la vista previa; **no descarga nada automáticamente**. En la vista previa, el usuario debe presionar **⬇ PDF** para el trimestre mostrado o **Descargar los 3 PDF** cuando eligió *Todos (3 archivos)*. Se generan `cuadros-<cuadro>-1trim.pdf`, `-2trim.pdf` y `-3trim.pdf` en papel Carta apaisado, capturando la vista previa tal como se ve en pantalla.
 - **Vista previa**: botones para descargar el Excel o el PDF **del cuadro abierto**, además de Imprimir. En *Promovidos y Retenidos* se agrega una **segunda hoja** con el registro de reprobados agrupado por grado; esa hoja también se incluye en el PDF y en la impresión.
 - **Excel**: en cada trimestre de *Promovidos y Retenidos*, inmediatamente después de la hoja del cuadro, se genera la hoja `REPROBADOS <t>º TRIM` con el listado separado por grados y una columna por área (la descarga general pasa a tener 12 hojas; la de un solo cuadro, 2).
 - **Registro de derivados y descargas**: al guardar se recalculan `consolidado-anual`, `estadisticas` y `graficos`; cada PDF, Excel o Word generado deja un documento con fecha y nombre en `exportaciones/<pdf|excel|word>`.
 
-El PDF se genera con `html2canvas` + `jspdf`: se captura a 3x y se reduce a 2x con suavizado de alta calidad (supermuestreo) para que las letras y los bordes queden más nítidos, y se incrusta como JPEG de alta calidad (se elige automáticamente la mejor combinación que mantiene el archivo por debajo de 1 MB). El Excel usa `xlsx-js-style` y `fflate` para aplicar la configuración de impresión, con fuentes y filas ampliadas para facilitar la lectura; el informe Word usa tablas con texto de 10 pt. Las librerías se cargan bajo demanda para no aumentar el bundle inicial.
+El PDF se genera con `html2canvas` + `jspdf`: se captura a 3x y se reduce a 2x con suavizado de alta calidad (supermuestreo) para que las letras y los bordes queden más nítidos, y se incrusta como JPEG de alta calidad (se elige automáticamente la mejor combinación que mantiene el archivo por debajo de 1 MB). El Excel usa `xlsx-js-style` y `fflate` para aplicar la configuración de impresión a una sola página, con fuentes y filas ampliadas para facilitar la lectura; el informe Word usa tablas con texto de 10 pt. `xlsx-js-style` se importa con `modulo.default ?? modulo` porque en el bundle ESM la librería CommonJS queda expuesta solo en `default` (sin ese ajuste, el botón **Descargar Excel del menú** fallaba con `book_new`). Las librerías se cargan bajo demanda para no aumentar el bundle inicial.
 
 ## Gráficos estadísticos
 
-- **Menú → Gráficos Estadísticos**: muestra, agregando los 12 grados a nivel de Unidad Educativa y comparando 1º, 2º y 3º trimestre. Los cuatro gráficos incluyen una cuarta categoría **PROMEDIO** con la media de los tres trimestres, y los resúmenes de texto también la muestran:
+- **Menú → Gráficos Estadísticos**: muestra, agregando los 12 grados a nivel de Unidad Educativa y comparando 1º, 2º y 3º trimestre. Los cuatro gráficos incluyen una cuarta categoría **ANUAL**; en *Temas* es la **suma** de los tres trimestres (33% + 34% + 33% = 100% cuando están completos) y en las demás series es la media, y los resúmenes de texto también la muestran:
   - **Generales de cada trimestre**: porcentajes de temas avanzados, promovidos y retenidos.
   - **Retenidos y aprobados**: cantidad de estudiantes en cada condición y línea de porcentaje de aprobados/retenidos (eje derecho).
   - **Temas programados y avanzados**: cantidades por trimestre y línea de porcentaje de temas avanzados (eje derecho).
@@ -150,7 +154,7 @@ En la cabecera de la sección hay un selector **Tipo de gráfico** con ocho opci
 
 En el modo **Histograma** se muestra una tarjeta única a todo el ancho, porque sus datos tienen requisitos distintos a los de los cuatro gráficos comparativos. El informe Word incluye los gráficos visibles en el modo seleccionado.
 
-Los reportes descargados desde el celular mantienen **el mismo formato horizontal que en una computadora**: el PDF captura la vista previa con ancho de escritorio (1250 px) y el Word inserta los gráficos renderizados a 1100 px; el Excel ya define `orientation="landscape"` en todas sus hojas.
+Los reportes descargados desde el celular mantienen **el mismo formato horizontal que en una computadora**: el PDF captura la vista previa con ancho de escritorio (1250 px) y el Word inserta los gráficos renderizados a 1100 px; el Excel define `orientation="landscape"` y ajuste a **una sola página** (`fitToWidth="1"`, `fitToHeight="1"`) en todas sus hojas.
 
 Los porcentajes se muestran como **números enteros** con signo `%` **debajo de cada gráfico**, en **cuatro columnas alineadas con su barra o punto** (1º, 2º y 3º trimestre, y **ANUAL**) y con un dato por línea, por ejemplo:
 
@@ -201,6 +205,26 @@ Los gráficos se generan con `chart.js`, cargado bajo demanda al abrir la secci�
 - `scripts/init-firestore.mjs` / `scripts/verify-firestore.mjs`: inicialización y verificación de la estructura.
 - `scripts/datos-iniciales.json`: datos de los 9 documentos importados a Firestore.
 - `scripts/import-data.mjs` / `scripts/verify-data.mjs`: importación y verificación de los datos.
+- `scripts/backfill-anual.mjs`: copia `T.PROG. ANUAL` a los trimestres donde falte.
+
+## Registro de adecuaciones
+
+Cada cambio funcional o visual debe documentarse aquí con la fecha y la sección del README que actualiza. Esto evita que una mejora se pierda al volver a publicar o al retomar el proyecto.
+
+| Fecha | Adecuación | Detalle |
+| --- | --- | --- |
+| 2026-11-22 | Descarga del Excel general | Corregido el error `Cannot read properties of undefined (reading 'book_new')`: `xlsx-js-style` se importa con `modulo.default ?? modulo`. Verificado: 12 hojas, 452 KB. |
+| 2026-11-22 | `T.PROG. ANUAL` en 3º trimestre | Se replica desde 1º (o desde cualquier trimestre si es administrador), también al hacer **Guardar**. Backfill de 108 casilleros con `npm run backfill:anual`. El 3º trimestre muestra el anual aunque no tenga avance cargado. |
+| 2026-11-22 | Valor anual de Temas | En gráficas y resúmenes es la **suma** de los tres trimestres (`33 + 34 + 33 = 100`), no un promedio. La etiqueta pasó de `PROMEDIO ANUAL` a `ANUAL`. |
+| 2026-11-22 | Excel con formato PDF | Carta apaisado, `fitToPage="1"`, `fitToWidth="1"` y **`fitToHeight="1"`**: cada hoja imprime en **una sola página**, con el mismo formato horizontal del PDF. |
+| 2026-11-22 | Formulario al actualizar | La URL guarda `#/form/<cuadro>/<trimestre>/<grado>`; al recargar se reabre el formulario y **⟳ Cargar Datos** no regresa al menú. |
+| 2026-11-22 | Reprobados | Registro nominal con una fila por estudiante, columna por área, nota solo en áreas reprobadas, confirmación flotante al guardar y segunda hoja en vista previa, PDF y Excel. |
+| 2026-11-22 | Nitidez del PDF | Captura a 3x reducida a 2x con suavizado alto y JPEG adaptativo; tamaño final verificado por debajo de 1 MB sin degradar letras ni gráficos. |
+| 2026-11-22 | Columnas compactas | Cuadros `11/9/22/13` y reprobados `8/46/14`; tabla y formulario a todo el ancho en escritorio. |
+| 2026-11-22 | Imágenes de encabezado | Escudo e icono incrustados en Excel con relaciones y `Content_Types` válidos; `icono.webp` convertido a PNG data URI para `html2canvas` y Excel. |
+| 2026-11-22 | Metadatos al compartir | `iconolink.png` (180×180) como favicon, `apple-touch-icon`, `og:image` y `twitter:image`; `og:description` conservado. |
+| 2026-11-22 | Estructura Firestore | Migración a `reportes-academicos/**`, fallback a rutas antiguas con copia perezosa y migrate-on-read, reglas desplegadas y scripts de verificación. |
+| 2026-11-22 | Derivados y exportaciones | `actualizarDerivados()` al guardar y `registrarExportacion()` en PDF/Excel/Word. |
 
 ## Seguridad
 
