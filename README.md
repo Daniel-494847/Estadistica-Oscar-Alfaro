@@ -108,7 +108,7 @@ El icono que se muestra al compartir el enlace está en `src/icono.webp`, el fav
 - **Vista previa**: botones para descargar el Excel o el PDF **del cuadro abierto**, además de Imprimir. En *Promovidos y Retenidos* se agrega una **segunda hoja** con el registro de reprobados agrupado por grado; esa hoja también se incluye en el PDF y en la impresión.
 - **Excel**: en cada trimestre de *Promovidos y Retenidos*, inmediatamente después de la hoja del cuadro, se genera la hoja `REPROBADOS <t>º TRIM` con el listado separado por grados y una columna por área (la descarga general pasa a tener 12 hojas; la de un solo cuadro, 2).
 
-El PDF se genera con `html2canvas` + `jspdf`; el Excel con `xlsx-js-style` y `fflate` para aplicar la configuración de impresión. Las librerías se cargan bajo demanda para no aumentar el bundle inicial.
+El PDF se genera con `html2canvas` + `jspdf`; se incrusta como JPEG de alta calidad (se elige automáticamente la mejor combinación que mantiene el archivo por debajo de 1 MB, sin bajar la resolución si no es necesario) para conservar la nitidez de letras y gráficos. El Excel usa `xlsx-js-style` y `fflate` para aplicar la configuración de impresión. Las librerías se cargan bajo demanda para no aumentar el bundle inicial.
 
 ## Gráficos estadísticos
 

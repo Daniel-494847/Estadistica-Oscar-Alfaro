@@ -1912,27 +1912,13 @@ export class AppComponent {
   private async generarPDF(libs: Awaited<ReturnType<AppComponent['cargarLibsPDF']>>, nombreArchivo: string) {
     const hojas = [...document.querySelectorAll<HTMLElement>('.hoja')];
     if (!hojas.length) throw new Error('No se encontró la vista previa');
-    const pdf = new libs.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
-    const margen = 8;
-    const ancho = pdf.internal.pageSize.getWidth() - margen * 2;
-    const altoPagina = pdf.internal.pageSize.getHeight() - margen * 2;
-    let primera = true;
 
-    const agregar = (canvas: HTMLCanvasElement) => {
-      const altoParcela = Math.floor(canvas.width * altoPagina / ancho);
-      let y = 0;
-      while (y < canvas.height) {
-        const alto = Math.min(altoParcela, canvas.height - y);
-        const parte = document.createElement('canvas');
-        parte.width = canvas.width; parte.height = alto;
-        const ctx = parte.getContext('2d')!;
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, parte.width, parte.height);
-        ctx.drawImage(canvas, 0, y, canvas.width, alto, 0, 0, canvas.width, alto);
-        if (!primera) pdf.addPage();
-        pdf.addImage(parte.toDataURL('image/png'), 'PNG', margen, margen, ancho, alto * ancho / canvas.width);
-        y += alto; primera = false;
-      }
-    };
+    const opciones = { orientation: 'landscape', unit: 'mm', format: 'letter', compress: true } as const;
+    const medidas = new libs.jsPDF(opciones);
+    const margen = 8;
+    const ancho = medidas.internal.pageSize.getWidth() - margen * 2;
+    const altoPagina = medidas.internal.pageSize.getHeight() - margen * 2;
+    const paginas: { canvas: HTMLCanvasElement; altoMM: number }[] = [];
 
     for (const hoja of hojas) {
       // Se captura una copia con el ancho de escritorio para que en el celular
@@ -1957,9 +1943,82 @@ export class AppComponent {
       } finally {
         copia.remove();
       }
-      agregar(canvas);
+
+      const altoParcela = Math.floor(canvas.width * altoPagina / ancho);
+      let y = 0;
+      while (y < canvas.height) {
+        const alto = Math.min(altoParcela, canvas.height - y);
+        const parte = document.createElement('canvas');
+        parte.width = canvas.width; parte.height = alto;
+        const ctx = parte.getContext('2d')!;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, parte.width, parte.height);
+        ctx.drawImage(canvas, 0, y, canvas.width, alto, 0, 0, canvas.width, alto);
+        paginas.push({ canvas: parte, altoMM: alto * ancho / canvas.width });
+        y += alto;
+      }
     }
-    pdf.save(nombreArchivo);
+
+    // JPEG a alta calidad mantiene nítidas las letras y los gráficos; PNG inflaba
+    // cada página varios cientos de KB. Se elige la mejor combinación que quede
+    // por debajo del objetivo, sin reducir resolución si no hace falta.
+    const tamanoDataUrl = (url: string) => Math.ceil((url.length - url.indexOf(',') - 1) * 3 / 4);
+    const reducir = (canvas: HTMLCanvasElement, factor: number) => {
+      const salida = document.createElement('canvas');
+      salida.width = Math.max(1, Math.round(canvas.width * factor));
+      salida.height = Math.max(1, Math.round(canvas.height * factor));
+      const ctx = salida.getContext('2d')!;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(canvas, 0, 0, salida.width, salida.height);
+      return salida;
+    };
+    const calidades = [0.94, 0.9, 0.86, 0.82, 0.78, 0.74, 0.7];
+    const escalas = [1, 0.9, 0.8, 0.7];
+    const OBJETIVO = 950_000; // deja margen para la estructura del PDF (< 1 MB)
+
+    let elegida: { urls: string[] } | null = null;
+    let mejor: { size: number; urls: string[] } | null = null;
+
+    for (const escala of escalas) {
+      for (const calidad of calidades) {
+        const urls: string[] = [];
+        let size = 0;
+        for (const p of paginas) {
+          const url = (escala === 1 ? p.canvas : reducir(p.canvas, escala)).toDataURL('image/jpeg', calidad);
+          urls.push(url);
+          size += tamanoDataUrl(url);
+          if (size > OBJETIVO) break;
+        }
+        if (size <= OBJETIVO) { elegida = { urls }; break; }
+        if (urls.length === paginas.length && (!mejor || size < mejor.size)) mejor = { size, urls };
+      }
+      if (elegida) break;
+    }
+
+    const urls = (elegida ?? mejor ?? {
+      urls: paginas.map(p => reducir(p.canvas, 0.7).toDataURL('image/jpeg', 0.6)),
+    }).urls;
+
+    const construir = (imagenes: string[]) => {
+      const doc = new libs.jsPDF(opciones);
+      imagenes.forEach((url, i) => {
+        if (i) doc.addPage();
+        doc.addImage(url, 'JPEG', margen, margen, ancho, paginas[i].altoMM, undefined, 'FAST');
+      });
+      return doc;
+    };
+
+    let blob = construir(urls).output('blob');
+    if (blob.size > 1_000_000) {
+      // Último recurso: solo si aun así supera el límite, baja un poco más la resolución.
+      blob = construir(paginas.map(p => reducir(p.canvas, 0.65).toDataURL('image/jpeg', 0.6))).output('blob');
+    }
+
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url; enlace.download = nombreArchivo;
+    document.body.appendChild(enlace); enlace.click(); enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
 
   // PDF del cuadro abierto (botón de la vista previa)
