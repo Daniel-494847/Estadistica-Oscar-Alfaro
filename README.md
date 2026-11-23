@@ -39,7 +39,7 @@ git worktree prune
 
 Si alguna vez se pierde la configuración, en GitHub entra a **Settings → Pages → Build and deployment** y elige **Deploy from a branch → gh-pages / (root)**. Espera 1–2 minutos y abre la URL publicada.
 
-El icono que se muestra al compartir el enlace está en `src/icono.webp`, el favicon en `src/favicon.png` y los metadatos `og:*` / `twitter:*` en `src/index.html`.
+El icono que se muestra al compartir el enlace está en `src/icono.webp`, el icono de la pestaña/enlace en `src/iconolink.png` y los metadatos `og:*` / `twitter:*` en `src/index.html`.
 
 ## Estado
 
