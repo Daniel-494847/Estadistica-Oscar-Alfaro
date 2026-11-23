@@ -725,27 +725,27 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
     }
     .hoja { max-width: 1250px; margin: 12px auto; padding: 8px; background: #fff; font-family: Cambria, serif; }
     .cab { display: flex; align-items: center; justify-content: space-between; text-align: center; margin-bottom: 8px; }
-    .cab img { height: 64px; flex-shrink: 0; } .cab > div { min-width: 0; overflow-wrap: anywhere; } .cab .b { font-weight: bold; font-size: 12pt; }
-    .cuadro { width: 100%; table-layout: fixed; border-collapse: collapse; border: 3px double #000; text-align: center; font-size: 8pt; }
-    .cuadro th, .cuadro td { border: 1px solid #000; padding: 0; height: 22px; overflow: hidden; overflow-wrap: anywhere; word-break: break-word; vertical-align: middle; }
-    .cuadro th { font-weight: bold; } .cuadro th.grado { width: 46px; font-size: 10pt; }
-    .cuadro th.campo { font-size: 8.5pt; height: auto; line-height: 1.1; padding: 2px 3px; }
+    .cab img { height: 68px; flex-shrink: 0; } .cab > div { min-width: 0; overflow-wrap: anywhere; } .cab .b { font-weight: bold; font-size: 13pt; }
+    .cuadro { width: 100%; table-layout: fixed; border-collapse: collapse; border: 3px double #000; text-align: center; font-size: 9pt; }
+    .cuadro th, .cuadro td { border: 1px solid #000; padding: 0; height: 24px; overflow: hidden; overflow-wrap: anywhere; word-break: break-word; vertical-align: middle; }
+    .cuadro th { font-weight: bold; } .cuadro th.grado { width: 48px; font-size: 11pt; }
+    .cuadro th.campo { font-size: 9.5pt; height: auto; line-height: 1.1; padding: 2px 3px; }
     /* Texto vertical con transformación: html2canvas lo captura sin desordenar las letras.
        El ancho del span equivale a la altura de la celda, así el texto se ajusta y no se sale. */
     .rot { position: relative; overflow: hidden; }
-    .rot span { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg); transform-origin: center center; white-space: normal; text-align: center; line-height: 1.05; font-size: 7pt; word-break: break-word; }
-    .temas .rot, .promedio .rot { height: 110px; } .promret .rot { height: 145px; }
-    .temas .rot span, .promedio .rot span { width: 104px; } .promret .rot span { width: 138px; }
+    .rot span { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg); transform-origin: center center; white-space: normal; text-align: center; line-height: 1.05; font-size: 8pt; word-break: break-word; }
+    .temas .rot, .promedio .rot { height: 116px; } .promret .rot { height: 152px; }
+    .temas .rot span, .promedio .rot span { width: 110px; } .promret .rot span { width: 144px; }
     .cuadro td.pc, .cuadro tr.tot td { font-weight: bold; } .cuadro tr.tot th, .cuadro tr.tot td { border-top: 3px double #000; }
-    .pie { margin: 10px 0 0 40%; font-size: 10pt; } .caja { display: inline-block; min-width: 60px; text-align: center; border: 3px double #000; padding: 1px 6px; }
+    .pie { margin: 10px 0 0 40%; font-size: 11pt; } .caja { display: inline-block; min-width: 64px; text-align: center; border: 3px double #000; padding: 1px 6px; }
     .lugar { border: 0; background: transparent; font: inherit; font-weight: bold; width: 320px; margin-top: 6px; }
     /* Segunda hoja: lista nominal de reprobados por grado */
     .hoja + .hoja { margin-top: 24px; page-break-before: always; break-before: page; }
-    .cuadro.reprobados { table-layout: auto; font-size: 10pt; }
+    .cuadro.reprobados { table-layout: auto; font-size: 11pt; }
     .cuadro.reprobados th, .cuadro.reprobados td { height: auto; padding: 3px 6px; }
     .cuadro.reprobados tr.grado-fila th { background: #fff2cc; text-align: left; }
     .cuadro.reprobados td.nombre, .cuadro.reprobados th.nombre { text-align: left; }
-    .cuadro.reprobados th.rot-area { font-size: 6pt; line-height: 1.05; width: 58px; }
+    .cuadro.reprobados th.rot-area { font-size: 7pt; line-height: 1.05; width: 62px; }
     /* Fondo elegante aplicado a TODO el proyecto */
     body { margin: 0; min-height: 100vh; color: #0f172a;
       background-color: #06152b;
@@ -1639,7 +1639,7 @@ export class AppComponent {
       };
       const celda = (texto: string, op: any = {}) => new TableCell({
         children: [new Paragraph({
-          children: [new TextRun({ text: texto, bold: !!op.bold, size: 18 })],
+          children: [new TextRun({ text: texto, bold: !!op.bold, size: 20 })],
           alignment: op.center ? AlignmentType.CENTER : AlignmentType.JUSTIFIED,
           spacing: { before: 20, after: 20, line: 240 },
         })],
@@ -1706,7 +1706,7 @@ export class AppComponent {
       const capturas = await this.capturarGraficosEscritorio(idsGraficos);
       for (const cap of capturas) children.push(imagen(cap));
       children.push(new Paragraph({
-        children: [new TextRun({ text: 'Los porcentajes y el promedio general se presentan con dos decimales. Los gráficos comparan 1º, 2º y 3º trimestre.', size: 18 })],
+        children: [new TextRun({ text: 'Los porcentajes y el promedio general se presentan con dos decimales. Los gráficos comparan 1º, 2º y 3º trimestre.', size: 20 })],
         spacing: { before: 120 },
       }));
 
@@ -1936,13 +1936,25 @@ export class AppComponent {
         : new Promise(res => { img.onload = img.onerror = () => res(null); })));
       let canvas: HTMLCanvasElement;
       try {
+        // Se captura a 3x y se reduce a 2x con suavizado de alta calidad: el
+        // supermuestreo deja las letras y bordes mucho más nítidos sin aumentar
+        // el tamaño final del PDF.
         canvas = await libs.html2canvas(copia, {
-          scale: 2, backgroundColor: '#ffffff', useCORS: true,
+          scale: 3, backgroundColor: '#ffffff', useCORS: true,
           windowWidth: anchoEscritorio, windowHeight: Math.max(copia.scrollHeight, 800),
         });
       } finally {
         copia.remove();
       }
+      const anchoNitido = anchoEscritorio * 2;
+      const reducido = document.createElement('canvas');
+      reducido.width = anchoNitido;
+      reducido.height = Math.round(canvas.height * anchoNitido / canvas.width);
+      const ctxNitido = reducido.getContext('2d')!;
+      ctxNitido.imageSmoothingEnabled = true;
+      ctxNitido.imageSmoothingQuality = 'high';
+      ctxNitido.drawImage(canvas, 0, 0, reducido.width, reducido.height);
+      canvas = reducido;
 
       const altoParcela = Math.floor(canvas.width * altoPagina / ancho);
       let y = 0;
@@ -1972,7 +1984,7 @@ export class AppComponent {
       ctx.drawImage(canvas, 0, 0, salida.width, salida.height);
       return salida;
     };
-    const calidades = [0.94, 0.9, 0.86, 0.82, 0.78, 0.74, 0.7];
+    const calidades = [0.96, 0.94, 0.92, 0.9, 0.86, 0.82, 0.78];
     const escalas = [1, 0.9, 0.8, 0.7];
     const OBJETIVO = 950_000; // deja margen para la estructura del PDF (< 1 MB)
 
