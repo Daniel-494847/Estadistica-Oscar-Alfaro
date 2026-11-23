@@ -45,9 +45,23 @@ El icono que se muestra al compartir el enlace está en `src/icono.webp`, el ico
 
 - Proyecto Firebase configurado: `estadisticas-3b3c2`.
 - Reglas e índices de Firestore desplegados (`firebase.json`, `firestore.rules`, `firestore.indexes.json`).
-- Colección `cuadros` (U.E. Oscar Alfaro) y, si el administrador crea otras, `cuadros_<slug>`. Cada una con los 9 documentos que usa la app
-  (3 cuadros × 3 trimestres): `temas_1..3`, `promret_1..3`, `promedio_1..3`, más `acceso` con las preferencias.
-- Registro de unidades educativas y escudos en `config/colegios`.
+- Toda la información vive bajo `reportes-academicos/<unidad>` (`cuadros` para la U.E. Oscar Alfaro o `cuadros_<slug>` para las nuevas):
+  ```
+  reportes-academicos/<unidad>/
+  ├── cuadros-trimestrales/     temas_1..3
+  ├── consolidado-anual/        gestion-<año>
+  ├── promedios-por-area/       promedio_1..3
+  ├── promovidos-retenidos/     promret_1..3
+  ├── estadisticas/             resumen
+  ├── graficos/                 series
+  └── exportaciones/
+      ├── pdf/
+      ├── excel/
+      └── word/
+  ```
+  Las preferencias (bloqueos, trimestre, áreas, nombre y escudo) son campos del documento `reportes-academicos/<unidad>`.
+- Registro global de unidades y escudos en `reportes-academicos/_registro`.
+- Las rutas antiguas (`cuadros/<id>`, `config/colegios`) se leen como respaldo y se copian perezosamente a la estructura nueva; no se escriben.
 - Datos reales importados y verificados desde `scripts/datos-iniciales.json`
   (1º y 2º trimestre con datos; 3º trimestre vacío a la espera de carga).
 - Los 12 grados están presentes en los 6 documentos con datos (incluido `1A` en `temas_1`).
@@ -60,7 +74,7 @@ El icono que se muestra al compartir el enlace está en `src/icono.webp`, el ico
 - En **Promovidos y Retenidos** hay un registro nominal de **estudiantes reprobados** por grado:
   **una fila por estudiante** y **una columna por cada área de aprendizaje**, con la nota (0-100)
   solo en las áreas que reprobó. Se guarda en `_reprobados` dentro de la fila de cada grado del
-  documento `promret_<trimestre>`, con el mismo botón **Guardar Registro** y el mismo bloqueo por
+  documento `promret_<trimestre>` de `promovidos-retenidos`, con el mismo botón **Guardar Registro** y el mismo bloqueo por
   trimestre. Los registros antiguos de una fila por área se agrupan automáticamente al abrir el cuadro.
 
 > Firestore no requiere crear colecciones manualmente: se crean al escribir el primer documento. Para inicializar o verificar la estructura se usan los scripts de abajo.
@@ -70,7 +84,7 @@ El icono que se muestra al compartir el enlace está en `src/icono.webp`, el ico
 - El acceso está en un botón pequeño **Ingresar administrador** en la parte superior izquierda, visible en todas las vistas. El acceso a los tres cuadros sigue siendo **anónimo** y no requiere iniciar sesión.
 - El administrador entra con **Firebase Auth (correo y contraseña)** y tiene **control total**: puede modificar todos los campos de los tres cuadros, incluido **T.PROG. ANUAL** en 2º y 3º trimestre (para usuarios anónimos, ese casillero es de solo lectura fuera del 1º trimestre).
 - Si el administrador cambia **T.PROG. ANUAL** en cualquier trimestre, el valor se replica automáticamente a los tres documentos.
-- El panel tiene interruptores para **bloquear la edición por trimestre** (1º, 2º, 3º) y botones **Bloquear todo / Desbloquear todo**. El estado se guarda en `cuadros/acceso` y afecta solo a usuarios anónimos: los campos se deshabilitan y el botón **Guardar Registro** deja de estar disponible. El administrador siempre puede editar.
+- El panel tiene interruptores para **bloquear la edición por trimestre** (1º, 2º, 3º) y botones **Bloquear todo / Desbloquear todo**. El estado se guarda en `reportes-academicos/<unidad>` y afecta solo a usuarios anónimos: los campos se deshabilitan y el botón **Guardar Registro** deja de estar disponible. El administrador siempre puede editar.
 
 ### Alta del usuario (una sola vez, en Firebase Console)
 
@@ -84,9 +98,9 @@ El icono que se muestra al compartir el enlace está en `src/icono.webp`, el ico
 
 ### Opciones adicionales del panel
 
-- **Trimestre preferido**: el administrador elige qué trimestre se abre por defecto al entrar a cualquier cuadro. Se guarda en `<coleccion>/acceso` y aplica a todos los usuarios.
+- **Trimestre preferido**: el administrador elige qué trimestre se abre por defecto al entrar a cualquier cuadro. Se guarda en `reportes-academicos/<unidad>` y aplica a todos los usuarios.
 - **Áreas de aprendizaje**: se pueden **añadir** (nombre + grupo) y **quitar** áreas. Los cambios afectan a los tres cuadros, los gráficos y el Excel de esa unidad educativa. El `id` del área es la clave usada en Firestore, por lo que quitar un área no borra sus datos históricos; solo deja de mostrarse y de contarse.
-- **Unidades educativas**: solo el administrador ve la lista y el selector. La U.E. original usa la colección `cuadros`; cada unidad nueva usa su propia colección `cuadros_<slug>` con los mismos 9 cuadros + `acceso`.
+- **Unidades educativas**: solo el administrador ve la lista y el selector. Cada unidad es un documento bajo `reportes-academicos` (`cuadros` o `cuadros_<slug>`) con la estructura indicada arriba.
   - Al crearla se puede subir un **escudo** (se reduce a 240×240 y se guarda como imagen incrustada en el registro). El escudo aparece en la vista previa, en los PDF y en los Excel. El nombre de la U.E. aparece en los títulos de todos los archivos generados.
   - El panel muestra el **enlace privado de esa U.E.** (`...?colegio=<slug>`) y un botón para copiarlo. Los usuarios anónimos que abren ese enlace trabajan automáticamente en esa unidad; no pueden ver la lista de unidades.
   - El botón **Descargar respaldo (.json)** guarda en el equipo la base de datos de la **unidad educativa activa** (seleccionada en el desplegable de administrador), sin borrar ni modificar nada. El mismo respaldo se puede volver a cargar con **Importar base de datos (.json)**.
@@ -103,10 +117,11 @@ El icono que se muestra al compartir el enlace está en `src/icono.webp`, el ico
 ## Descargas
 
 - **Fondo global y responsividad**: degradado moderno, textura de cuadrícula y brillos laterales aplicados a **todo el proyecto**. El menú usa un panel de cristal y los formularios un panel claro sobre ese fondo. En celular, selectores, tarjetas y botones usan columnas Bootstrap de ancho completo (`col-12`) y las tablas anchas se desplazan dentro de `.table-responsive` con la primera columna fija; el cuerpo de la página nunca sale del ancho del dispositivo. Los documentos generados conservan su diseño original.
-- **Menú → Descargar Excel**: genera `registro-estadistico.xlsx` con 9 hojas (3 cuadros × 3 trimestres), con el mismo formato de la vista previa: títulos, encabezados combinados, texto vertical, bordes dobles, tipografía Cambria y configuración de impresión en papel Carta apaisado ajustado al ancho. El tamaño Carta (`paperSize=1`), la orientación apaisada, el ajuste al ancho y el centrado horizontal ya vienen listos en cada hoja; no hay que configurarlos al imprimir.
+- **Menú → Descargar Excel**: genera `registro-estadistico.xlsx` con 12 hojas (9 cuadros + 3 de reprobados), con el mismo formato de la vista previa: títulos, encabezados combinados, texto vertical, bordes dobles, tipografía Cambria y configuración de impresión en papel Carta apaisado ajustado al ancho. Las dos imágenes del encabezado (escudo de la U.E. e icono) se incrustan en cada hoja; el icono se convierte a PNG para que Excel y el PDF lo muestren siempre. El tamaño Carta (`paperSize=1`), la orientación apaisada, el ajuste al ancho y el centrado horizontal ya vienen listos en cada hoja; no hay que configurarlos al imprimir.
 - **Menú → Descargar PDF**: permite elegir el **cuadro** (Temas, Promedios o Promovidos/Retenidos) y el **trimestre**. El botón abre la vista previa; **no descarga nada automáticamente**. En la vista previa, el usuario debe presionar **⬇ PDF** para el trimestre mostrado o **Descargar los 3 PDF** cuando eligió *Todos (3 archivos)*. Se generan `cuadros-<cuadro>-1trim.pdf`, `-2trim.pdf` y `-3trim.pdf` en papel Carta apaisado, capturando la vista previa tal como se ve en pantalla.
 - **Vista previa**: botones para descargar el Excel o el PDF **del cuadro abierto**, además de Imprimir. En *Promovidos y Retenidos* se agrega una **segunda hoja** con el registro de reprobados agrupado por grado; esa hoja también se incluye en el PDF y en la impresión.
 - **Excel**: en cada trimestre de *Promovidos y Retenidos*, inmediatamente después de la hoja del cuadro, se genera la hoja `REPROBADOS <t>º TRIM` con el listado separado por grados y una columna por área (la descarga general pasa a tener 12 hojas; la de un solo cuadro, 2).
+- **Registro de derivados y descargas**: al guardar se recalculan `consolidado-anual`, `estadisticas` y `graficos`; cada PDF, Excel o Word generado deja un documento con fecha y nombre en `exportaciones/<pdf|excel|word>`.
 
 El PDF se genera con `html2canvas` + `jspdf`: se captura a 3x y se reduce a 2x con suavizado de alta calidad (supermuestreo) para que las letras y los bordes queden más nítidos, y se incrusta como JPEG de alta calidad (se elige automáticamente la mejor combinación que mantiene el archivo por debajo de 1 MB). El Excel usa `xlsx-js-style` y `fflate` para aplicar la configuración de impresión, con fuentes y filas ampliadas para facilitar la lectura; el informe Word usa tablas con texto de 10 pt. Las librerías se cargan bajo demanda para no aumentar el bundle inicial.
 
@@ -162,8 +177,9 @@ Los gráficos se generan con `chart.js`, cargado bajo demanda al abrir la secci�
 | --- | --- |
 | `npm start` | Servidor de desarrollo |
 | `npm run build` | Compilación de producción |
-| `npm run init:firestore` | Crea los documentos faltantes en `cuadros` (no sobrescribe los existentes) |
-| `npm run verify:firestore` | Comprueba que los 9 documentos existan |
+| `npm run init:firestore` | Crea los documentos faltantes en `reportes-academicos/cuadros` (no sobrescribe los existentes) |
+| `npm run verify:firestore` | Comprueba que los 9 documentos existan (ruta nueva o respaldo antiguo) |
+| `npm run migrate:firestore` | Copia las rutas antiguas a la estructura nueva sin sobrescribir lo existente |
 | `npm run import:data` | Importa `scripts/datos-iniciales.json` reemplazando los 9 documentos |
 | `npm run verify:data` | Compara Firestore contra el JSON importado |
 | `npm run firebase:deploy` | Despliega reglas e índices de Firestore |
@@ -175,13 +191,14 @@ Los gráficos se generan con `chart.js`, cargado bajo demanda al abrir la secci�
 - `src/app/app.component.ts`: menú, formulario por grado, vista previa/impresión, descargas y gráficos estadísticos.
 - `src/app/export.service.ts`: generación del Excel con el formato de la vista previa y impresión en Carta.
 - `src/app/firebase.service.ts`: leer y guardar en Firestore.
-- `src/app/imagenes.ts`: escudo y retrato del encabezado.
-- `scripts/init-firestore.mjs` / `scripts/verify-firestore.mjs`: inicialización y verificación de la colección.
+- `src/app/imagenes.ts`: escudo de la U.E. e icono del encabezado.
+- `scripts/firestore-structure.mjs`: rutas y subcolecciones compartidas por los scripts.
+- `scripts/init-firestore.mjs` / `scripts/verify-firestore.mjs`: inicialización y verificación de la estructura.
 - `scripts/datos-iniciales.json`: datos de los 9 documentos importados a Firestore.
 - `scripts/import-data.mjs` / `scripts/verify-data.mjs`: importación y verificación de los datos.
 
 ## Seguridad
 
-`firestore.rules` permite leer/escribir `cuadros`, `cuadros_*` y `config` sin exigir inicio de sesión: los tres cuadros son anónimos y el apartado de administrador usa Firebase Auth en la interfaz. El bloqueo de edición por trimestre, la restricción de `T.PROG. ANUAL` y el ocultamiento de la lista de unidades a usuarios anónimos se aplican en la aplicación, no en el servidor. Cualquier persona con el enlace `?colegio=<slug>` puede acceder a esa unidad.
+`firestore.rules` permite leer/escribir `reportes-academicos/**` (y las rutas antiguas de respaldo) sin exigir inicio de sesión: los tres cuadros son anónimos y el apartado de administrador usa Firebase Auth en la interfaz. El bloqueo de edición por trimestre, la restricción de `T.PROG. ANUAL` y el ocultamiento de la lista de unidades a usuarios anónimos se aplican en la aplicación, no en el servidor. Cualquier persona con el enlace `?colegio=<slug>` puede acceder a esa unidad.
 
 Para exigirlo también en Firestore haría falta un *custom claim* de administrador y reglas por campo (además de mover la replicación del anual a un backend autorizado).

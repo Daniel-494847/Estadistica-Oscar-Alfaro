@@ -2,7 +2,7 @@ import { Component, ViewEncapsulation, computed, signal } from '@angular/core';
 import { AREAS_POR_DEFECTO, Area, CAMPOS_NOMBRES, GRADOS, REPROBADOS_KEY, TRIMESTRES, Col, Fila, Reprobado, Tipo, calcular, definir, gid, lineas, reprobadosDe, totales } from './config';
 import { AuthService } from './auth.service';
 import { ExportService } from './export.service';
-import { COLECCION_DEFECTO, Colegio, FirebaseService, IDS_CUADRO, SLUG_DEFECTO } from './firebase.service';
+import { COLECCION_DEFECTO, Colegio, FirebaseService, IDS_CUADRO, SLUG_DEFECTO, TipoExportacion } from './firebase.service';
 import { IMG } from './imagenes';
 
 type TipoGrafico = 'columna' | 'linea' | 'pastel' | 'barras' | 'area' | 'dispersion' | 'histograma' | 'combinado';
@@ -75,7 +75,7 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
             </button></div>
           }
           <div class="col-md-6"><button class="btn menu-card w-100 p-4 text-start h-100" (click)="exportar()">
-            <div class="fs-1 text-success"><i class="bi bi-file-earmark-excel"></i></div><div class="fw-bold fs-5">Descargar Excel</div><div class="small">Libro con los 9 cuadros (1º, 2º y 3º trimestre).</div>
+            <div class="fs-1 text-success"><i class="bi bi-file-earmark-excel"></i></div><div class="fw-bold fs-5">Descargar Excel</div><div class="small">Libro con los 9 cuadros (1º, 2º y 3º trimestre) y hojas de reprobados.</div>
           </button></div>
           <div class="col-md-6"><div class="menu-card h-100 p-4">
             <div class="d-flex justify-content-between align-items-start">
@@ -1726,6 +1726,7 @@ export class AppComponent {
       a.href = url; a.download = `informe-estadistico-${t}trim.docx`;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
+      this.registrarDescarga('word', `informe-estadistico-${t}trim.docx`, { trimestre: t });
       this.informeMsg.set('Informe descargado');
     } catch (e) { console.error(e); this.informeMsg.set('No se pudo generar el informe'); }
     this.generandoInforme.set(false);
@@ -1868,6 +1869,8 @@ export class AppComponent {
       await this.fb.guardarGrado(this.id(), gid(this.grado()), fila, { gestion: this.gestion(), lugar: this.lugar() }, this.coleccion());
       this.guardado.set(true);
       this.mostrarModalGuardado();
+      // El consolidado, las estadísticas y las series se recalculan en segundo plano.
+      void this.fb.actualizarDerivados(this.coleccion()).catch(() => undefined);
     } catch (e: any) {
       console.error(e);
       const detalle = e?.code === 'permission-denied' ? 'permisos de Firestore' : (e?.message ?? String(e));
@@ -1880,11 +1883,22 @@ export class AppComponent {
     return `cuadros-${this.tipo()}-${this.trim()}trim.${ext}`;
   }
 
+  /** Registra cada archivo generado en exportaciones/<pdf|excel|word>. */
+  private registrarDescarga(tipo: TipoExportacion, nombre: string, extra: Record<string, any> = {}) {
+    void this.fb.registrarExportacion(tipo, {
+      nombre,
+      cuadro: this.tipo(),
+      trimestre: this.trim(),
+      ...extra,
+    }, this.coleccion()).catch(() => undefined);
+  }
+
   // Excel con una hoja por cuadro y trimestre (1º, 2º y 3º), con el mismo formato de la vista previa
   async exportar() {
     this.cargando.set(true); this.msg.set('Generando Excel...');
     try {
-      await this.exp.exportarExcelTodo(id => this.fb.leer(id, this.coleccion()), this.areasCfg(), this.nombreUE(), this.escudoUE());
+      await this.exp.exportarExcelTodo(id => this.fb.leer(id, this.coleccion()), this.areasCfg(), this.nombreUE(), this.escudoUE(), this.img.retrato);
+      this.registrarDescarga('excel', 'registro-estadistico.xlsx');
       this.msg.set('Excel descargado');
     } catch (e) { console.error(e); this.msg.set('No se pudo generar el Excel'); }
     this.cargando.set(false);
@@ -1895,7 +1909,8 @@ export class AppComponent {
     this.cargando.set(true); this.msg.set('Generando Excel...');
     try {
       const d = await this.fb.leer(this.id(), this.coleccion());
-      await this.exp.exportarExcelUno(this.tipo(), this.trim(), d, this.areasCfg(), this.nombreUE(), this.escudoUE());
+      await this.exp.exportarExcelUno(this.tipo(), this.trim(), d, this.areasCfg(), this.nombreUE(), this.escudoUE(), this.img.retrato);
+      this.registrarDescarga('excel', `cuadros-${this.tipo()}-${this.trim()}trim.xlsx`);
       this.msg.set('Excel descargado');
     } catch (e) { console.error(e); this.msg.set('No se pudo generar el Excel'); }
     this.cargando.set(false);
@@ -2039,6 +2054,7 @@ export class AppComponent {
     try {
       const libs = await this.cargarLibsPDF();
       await this.generarPDF(libs, this.nombreArchivo('pdf'));
+      this.registrarDescarga('pdf', this.nombreArchivo('pdf'));
       this.msg.set('PDF descargado');
     } catch (e) {
       console.error(e);
@@ -2082,6 +2098,7 @@ export class AppComponent {
         this.vista.set('previa');
         await new Promise(r => setTimeout(r, 550)); // esperar a que Angular pinte la hoja
         await this.generarPDF(libs, `cuadros-${this.pdfTipo()}-${t}trim.pdf`);
+        this.registrarDescarga('pdf', `cuadros-${this.pdfTipo()}-${t}trim.pdf`, { trimestre: t, cuadro: this.pdfTipo() });
         await new Promise(r => setTimeout(r, 350)); // espacio entre descargas
       }
       this.msg.set(`${trims.length} PDF descargados`);

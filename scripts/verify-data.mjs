@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
+import { leerDocumento } from './firestore-structure.mjs';
 
 const ruta = join(dirname(fileURLToPath(import.meta.url)), 'datos-iniciales.json');
 const esperado = JSON.parse(readFileSync(ruta, 'utf8'));
@@ -24,15 +25,20 @@ const norm = v =>
 
 let errores = 0;
 for (const [id, payload] of Object.entries(esperado)) {
-  const snap = await getDoc(doc(db, 'cuadros', id));
-  if (!snap.exists()) {
+  const actual = await leerDocumento(db, id);
+  if (!actual) {
     console.log(`✗ ${id}: no existe`);
     errores++;
     continue;
   }
-  const actual = snap.data();
-  const diffs = ['datos', 'gestion', 'lugar'].filter(k =>
+  // _reprobados es un campo de la app, no parte del JSON semilla.
+  const sinReprobados = datos => Object.fromEntries(Object.entries(datos ?? {}).map(([g, fila]) => {
+    const { _reprobados, ...resto } = fila ?? {};
+    return [g, resto];
+  }));
+  const diffs = ['gestion', 'lugar'].filter(k =>
     JSON.stringify(norm(actual[k])) !== JSON.stringify(norm(payload[k])));
+  if (JSON.stringify(norm(sinReprobados(actual.datos))) !== JSON.stringify(norm(sinReprobados(payload.datos)))) diffs.push('datos');
   if (diffs.length) {
     console.log(`✗ ${id}: difiere en ${diffs.join(', ')}`);
     errores++;

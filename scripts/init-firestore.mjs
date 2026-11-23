@@ -1,8 +1,9 @@
-// Inicializa la colección `cuadros` con los 6 documentos que usa la aplicación.
+// Inicializa reportes-academicos/cuadros con los documentos que usa la aplicación.
 // Los documentos existentes NO se sobrescriben.
 // Uso: node scripts/init-firestore.mjs
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { IDS_CUADRO, refCuadro, refUE } from './firestore-structure.mjs';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAhW6B32EZ4AbQDXI9-OofzLuJ-3K-DgVs',
@@ -17,11 +18,21 @@ const firebaseConfig = {
 const db = getFirestore(initializeApp(firebaseConfig));
 const grados = ['1A','1B','2A','2B','3A','3B','4A','4B','5A','5B','6A','6B'];
 const datos = Object.fromEntries(grados.map(g => [g, {}]));
-const documentos = ['temas', 'promret', 'promedio'].flatMap(cuadro =>
-  [1, 2, 3].map(trimestre => `${cuadro}_${trimestre}`));
 
-for (const id of documentos) {
-  const ref = doc(db, 'cuadros', id);
+const ue = refUE(db);
+if (!(await getDoc(ue).catch(() => null))?.exists()) {
+  await setDoc(ue, {
+    nombre: 'OSCAR ALFARO',
+    coleccion: 'cuadros',
+    gestion: '2026',
+    creado: serverTimestamp(),
+    actualizado: serverTimestamp(),
+  });
+  console.log('+ reportes-academicos/cuadros: creado.');
+}
+
+for (const id of IDS_CUADRO) {
+  const ref = refCuadro(db, id);
   const snap = await getDoc(ref);
   if (snap.exists()) {
     console.log(`· ${id}: ya existe, se conserva.`);
@@ -36,4 +47,4 @@ for (const id of documentos) {
   });
   console.log(`+ ${id}: creado.`);
 }
-console.log('Listo. Colección `cuadros` inicializada.');
+console.log('Listo. reportes-academicos/cuadros inicializado.');

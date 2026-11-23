@@ -7,8 +7,13 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Cada unidad educativa nueva tiene su propia colección (cuadros_<slug>).
-    // El registro de unidades y sus escudos vive en config/colegios.
+    // Estructura obligatoria: reportes-academicos/<unidad>/<subcolección>/<documento>
+    // Incluye exportaciones/<pdf|excel|word>/<documento> y el registro global en _registro.
+    match /reportes-academicos/{unidad}/{resto=**} {
+      allow read, write: if true;
+    }
+
+    // Rutas antiguas: se conservan solo para la lectura de respaldo/migración perezosa.
     match /{coleccion}/{documento} {
       allow read, write: if coleccion == 'config' || coleccion.matches('cuadros_.*');
     }

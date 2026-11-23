@@ -1,7 +1,8 @@
-// Verifica que los documentos esperados existan en la colección `cuadros`.
+// Verifica los documentos esperados en reportes-academicos/cuadros.
 // Uso: node scripts/verify-firestore.mjs
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
+import { IDS_CUADRO, leerDocumento } from './firestore-structure.mjs';
 
 const db = getFirestore(initializeApp({
   apiKey: 'AIzaSyAhW6B32EZ4AbQDXI9-OofzLuJ-3K-DgVs',
@@ -10,10 +11,8 @@ const db = getFirestore(initializeApp({
   appId: '1:657244989745:web:d6ca3cab8d92cdd62e2810',
 }));
 
-const ids = ['temas', 'promret', 'promedio'].flatMap(cuadro =>
-  [1, 2, 3].map(trimestre => `${cuadro}_${trimestre}`));
-for (const id of ids) {
-  const snap = await getDoc(doc(db, 'cuadros', id));
-  const grados = Object.keys(snap.data()?.datos ?? {}).length;
-  console.log(`${id}: ${snap.exists() ? 'existe' : 'FALTA'} (${grados} grados)`);
+for (const id of IDS_CUADRO) {
+  const datos = await leerDocumento(db, id);
+  const grados = Object.keys(datos?.datos ?? {}).length;
+  console.log(`${id}: ${datos ? 'existe' : 'FALTA'} (${grados} grados)`);
 }

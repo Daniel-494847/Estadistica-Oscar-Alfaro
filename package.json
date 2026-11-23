@@ -7,6 +7,7 @@
     "build": "ng build",
     "init:firestore": "node scripts/init-firestore.mjs",
     "verify:firestore": "node scripts/verify-firestore.mjs",
+    "migrate:firestore": "node scripts/migrate-firestore.mjs",
     "import:data": "node scripts/import-data.mjs",
     "verify:data": "node scripts/verify-data.mjs",
     "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes --project estadisticas-3b3c2"
