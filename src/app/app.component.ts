@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, computed, signal } from '@angular/core';
+import { Component, ViewEncapsulation, computed, effect, signal } from '@angular/core';
 import { AREAS_POR_DEFECTO, Area, CAMPOS_NOMBRES, GRADOS, REPROBADOS_KEY, TRIMESTRES, Col, Fila, Reprobado, Tipo, calcular, definir, gid, lineas, reprobadosDe, totales } from './config';
 import { AuthService } from './auth.service';
 import { ExportService } from './export.service';
@@ -327,9 +327,9 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
         <div class="col-12 col-md-4"><button class="btn btn-primary w-100" (click)="cargar()">⟳ Cargar Datos</button></div>
       </div></div>
 
-      @if (!admin() && tipo() === 'temas' && trim() !== 1) {
+      @if (tipo() === 'temas' && trim() !== 1) {
         <div class="alert alert-info small py-2 mb-3">
-          El casillero <b>T.PROG. ANUAL</b> solo se registra en el <b>1º trimestre</b> y se aplica automáticamente a los tres trimestres. Para modificarlo, edítalo en el 1º trimestre.
+          El casillero <b>T.PROG. ANUAL</b> se registra en el <b>1º trimestre</b> y se copia automáticamente al 2º y al 3º. Para modificarlo, edítalo en el 1º trimestre.
         </div>
       }
 
@@ -595,7 +595,7 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
               <option [value]="0">1º trimestre</option>
               <option [value]="1">2º trimestre</option>
               <option [value]="2">3º trimestre</option>
-              <option [value]="3">Promedio anual</option>
+              <option [value]="3">Anual</option>
             </select>
           </div>
         }
@@ -881,7 +881,29 @@ export class AppComponent {
   bad = (c: Col) => !!c.ok && !c.ok(this.fila());
 
   constructor(private fb: FirebaseService, private exp: ExportService, public auth: AuthService) {
+    this.restaurarUbicacion();
     this.cargarColegios();
+    // Mantiene la ventana del formulario aunque se actualice la página (F5/Actualizar).
+    effect(() => {
+      const vista = this.vista(), tipo = this.tipo(), trim = this.trim(), grado = this.grado();
+      if (typeof window === 'undefined') return;
+      const url = new URL(window.location.href);
+      url.hash = vista === 'form' ? `/form/${tipo}/${trim}/${encodeURIComponent(grado)}` : '';
+      window.history.replaceState(null, '', url.toString());
+    });
+  }
+
+  /** Recupera el cuadro, trimestre y grado abiertos después de recargar la página. */
+  private restaurarUbicacion() {
+    if (typeof window === 'undefined') return;
+    const m = /^#\/form\/(temas|promret|promedio)\/([123])\/([^/]+)$/.exec(window.location.hash);
+    if (!m) return;
+    const grado = decodeURIComponent(m[3]);
+    if (!GRADOS.includes(grado)) return;
+    this.tipo.set(m[1] as Tipo);
+    this.trim.set(+m[2]);
+    this.grado.set(grado);
+    this.vista.set('form');
   }
 
   // Un grado tiene datos si alguna de sus celdas tiene valor (los grados sembrados están vacíos)
@@ -1292,21 +1314,24 @@ export class AppComponent {
       if (recargarDatos || !this.agregados) this.agregados = await this.obtenerAgregados();
       const { temas, promret, promedio }: { temas: Fila[]; promret: Fila[]; promedio: number[]; filas: any[] } = this.agregados;
       const num = (v: any) => +(String(v ?? '').replace('%', '')) || 0;
-      // Cada serie lleva un cuarto valor: la media de los tres trimestres.
+      // Temas: el valor anual es la SUMA de los tres trimestres (33 + 34 + 33 = 100),
+      // no el promedio. El resto de series conservan su media anual.
       const media = (v: number[]) => v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(2) : 0;
       const conMedia = (v: number[]) => [...v, media(v)];
-      const tpct = conMedia(temas.map(x => num(x['t_pct'])));
-      const tprog = conMedia(temas.map(x => num(x['t_prog'])));
-      const tavanz = conMedia(temas.map(x => num(x['t_avanz'])));
+      const suma = (v: number[]) => v.reduce((a, b) => a + b, 0);
+      const conSuma = (v: number[]) => [...v, suma(v)];
+      const tpct = conSuma(temas.map(x => num(x['t_pct'])));
+      const tprog = conSuma(temas.map(x => num(x['t_prog'])));
+      const tavanz = conSuma(temas.map(x => num(x['t_avanz'])));
       const pp = conMedia(promret.map(x => num(x['t_pp'])));
       const pr = conMedia(promret.map(x => num(x['t_pr'])));
       const paprob = conMedia(promret.map(x => num(x['t_prom'])));
       const pret = conMedia(promret.map(x => num(x['t_ret'])));
       const pro = conMedia(promedio.map(x => Number(x)));
-      const etiquetas = [...TRIMESTRES.map(t => `${t}º TRIM`), 'PROMEDIO ANUAL'];
+      const etiquetas = [...TRIMESTRES.map(t => `${t}º TRIM`), 'ANUAL'];
       const porTrim = (fn: (i: number) => string) => [
         ...TRIMESTRES.map((t, i) => `${t}º TRIMESTRE\n${fn(i)}`),
-        `PROMEDIO ANUAL\n${fn(3)}`,
+        `ANUAL\n${fn(3)}`,
       ].join('\n\n');
       this.resumenGeneral.set(porTrim(i => [
         `Temas Avanzados ${Math.round(tpct[i])}%`,
@@ -1330,14 +1355,14 @@ export class AppComponent {
       const unaColumna = this.columnasGraficos() === 1;
       Chart.defaults.font.size = unaColumna ? 11 : 10;
       const etiquetasChart = tipo === 'barras'
-        ? ['1º TRIMESTRE', '2º TRIMESTRE', '3º TRIMESTRE', 'PROMEDIO ANUAL']
-        : ['1º TRIM', '2º TRIM', '3º TRIM', 'PROMEDIO ANUAL'];
+        ? ['1º TRIMESTRE', '2º TRIMESTRE', '3º TRIMESTRE', 'ANUAL']
+        : ['1º TRIM', '2º TRIM', '3º TRIM', 'ANUAL'];
       const esBarra = tipo === 'columna' || tipo === 'barras';
       const esCombo = tipo === 'combinado';
       const esPunto = tipo === 'dispersion';
       const rgba = (hex: string, a = 1) =>
         `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
-      // La dispersión usa el trimestre como eje X numérico; "PROMEDIO ANUAL" no es un periodo, por eso se omite.
+      // La dispersión usa el trimestre como eje X numérico; "ANUAL" no es un periodo, por eso se omite.
       const puntos = (v: number[]) => v.slice(0, 3).map((y, i) => ({ x: i + 1, y }));
 
       const opciones = (max?: number, conPorcentaje = false): any => {
@@ -1741,36 +1766,56 @@ export class AppComponent {
     const g = gid(this.grado());
     this.datos.update(d => ({ ...d, [g]: { ...d[g], [key]: v } }));
     this.guardado.set(false);
-    // Campos que se escriben en 1º trimestre y se replican a los tres:
-    // - T.PROG. ANUAL: solo se edita en 1º (salvo el administrador).
-    // - ESTUDIANTES EFECTIVOS: se replica, pero se puede modificar en 2º y 3º.
-    const replicaAnual = this.tipo() === 'temas' && key.endsWith('_anual') && (this.trim() === 1 || this.admin());
-    const replicaEfec = this.tipo() === 'promret' && key === 'efec' && this.trim() === 1;
-    if (replicaAnual || replicaEfec) this.replicarEnTrimestres(g, key, v);
+    // T.PROG. ANUAL: se edita en 1º (o en cualquier trimestre si es administrador)
+    // y se copia automáticamente a los otros dos. ESTUDIANTES EFECTIVOS se replica
+    // desde 1º, pero se puede modificar en 2º y 3º.
+    if (this.tipo() === 'temas' && key.endsWith('_anual') && (this.trim() === 1 || this.admin())) {
+      const k = `temas_anual_${g}`;
+      clearTimeout(this.replicarTimers.get(k));
+      this.replicarTimers.set(k, setTimeout(() => {
+        void this.replicarAnual(g).then(() => this.msg.set('T.PROG. ANUAL replicado en los tres trimestres'))
+          .catch(e => { console.error(e); this.msg.set('No se pudo replicar T.PROG. ANUAL'); });
+      }, 400));
+    }
+    if (this.tipo() === 'promret' && key === 'efec' && this.trim() === 1) this.replicarEfec(g, v);
   }
 
-  private replicarEnTrimestres(g: string, key: string, v: string) {
-    const esEfec = key === 'efec';
-    const prefijo = esEfec ? 'promret' : 'temas';
-    const etiqueta = esEfec ? 'ESTUDIANTES EFECTIVOS' : 'T.PROG. ANUAL';
-    const k = `${prefijo}_${g}_${key}`;
+  private replicarEfec(g: string, v: string) {
+    const k = `promret_${g}_efec`;
     clearTimeout(this.replicarTimers.get(k));
     this.replicarTimers.set(k, setTimeout(async () => {
       try {
         for (const t of TRIMESTRES) {
-          const id = `${prefijo}_${t}`;
+          const id = `promret_${t}`;
           const doc = await this.fb.leer(id, this.coleccion());
           const grado = doc?.['datos']?.[g];
           if (v === '') {
-            // Si se limpia el valor, se quita el campo donde exista; no se crea un grado vacío.
-            if (grado) await this.fb.borrarCampoGrado(id, g, key, this.coleccion());
+            if (grado) await this.fb.borrarCampoGrado(id, g, 'efec', this.coleccion());
           } else {
-            await this.fb.guardarGrado(id, g, { ...(grado ?? {}), [key]: v }, {}, this.coleccion());
+            await this.fb.guardarGrado(id, g, { ...(grado ?? {}), efec: v }, {}, this.coleccion());
           }
         }
-        this.msg.set(`${etiqueta} replicado en los tres trimestres`);
-      } catch (e) { console.error(e); this.msg.set(`No se pudo replicar ${etiqueta}`); }
+        this.msg.set('ESTUDIANTES EFECTIVOS replicado en los tres trimestres');
+      } catch (e) { console.error(e); this.msg.set('No se pudo replicar ESTUDIANTES EFECTIVOS'); }
     }, 400));
+  }
+
+  /** Copia todos los T.PROG. ANUAL del trimestre actual a los otros dos. */
+  private async replicarAnual(g: string, idOrigen = this.id()) {
+    const origen = await this.fb.leer(idOrigen, this.coleccion()).catch(() => null);
+    const fila = origen?.['datos']?.[g];
+    if (!fila) return;
+    const anuales: Record<string, any> = {};
+    for (const [k, v] of Object.entries(fila)) {
+      if (k.endsWith('_anual')) anuales[k] = v ?? '';
+    }
+    if (!Object.keys(anuales).length) return;
+    for (const t of TRIMESTRES) {
+      const id = `temas_${t}`;
+      if (id === idOrigen) continue;
+      const doc = await this.fb.leer(id, this.coleccion()).catch(() => null);
+      await this.fb.guardarGrado(id, g, { ...(doc?.['datos']?.[g] ?? {}), ...anuales }, {}, this.coleccion());
+    }
   }
   // Evita que la rueda del ratón cambie el valor de los campos numéricos
   bloquearScroll(e: Event) {
@@ -1869,6 +1914,11 @@ export class AppComponent {
       await this.fb.guardarGrado(this.id(), gid(this.grado()), fila, { gestion: this.gestion(), lugar: this.lugar() }, this.coleccion());
       this.guardado.set(true);
       this.mostrarModalGuardado();
+      // Asegura que el anual digitado en 1º (o por el administrador) exista en los tres trimestres,
+      // incluso si el temporizador de la escritura no llegó a ejecutarse.
+      if (this.tipo() === 'temas' && (this.trim() === 1 || this.admin())) {
+        void this.replicarAnual(gid(this.grado())).catch(() => undefined);
+      }
       // El consolidado, las estadísticas y las series se recalculan en segundo plano.
       void this.fb.actualizarDerivados(this.coleccion()).catch(() => undefined);
     } catch (e: any) {

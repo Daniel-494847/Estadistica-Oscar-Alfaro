@@ -281,8 +281,9 @@ export class ExportService {
     for (const key of Object.keys(zip)) {
       if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(key)) continue;
       let xml = strFromU8(zip[key]);
+      // Igual que el PDF: carta horizontal y una sola página por hoja.
       const pagina =
-        '<pageSetup paperSize="1" orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
+        '<pageSetup paperSize="1" orientation="landscape" fitToWidth="1" fitToHeight="1"/>';
       if (!/<sheetPr\b/.test(xml)) {
         xml = xml.replace(/<worksheet\b[^>]*>/, m => m + '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
       }

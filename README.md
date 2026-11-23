@@ -69,6 +69,8 @@ La imagen que se muestra al compartir el enlace es `src/iconolink.png` (180×180
   con datos y avisa si el grado actual está vacío.
 - En **Temas Programados**, el valor de **T.PROG. ANUAL** escrito en 1º trimestre se replica
   automáticamente en 2º y 3º trimestre para el mismo grado y área (se guarda en los 3 documentos).
+  El 3º trimestre muestra el anual aunque todavía no tenga programación/avance cargado. Si los datos
+  se importaron antes de esta mejora, `npm run backfill:anual` agrega los casilleros faltantes.
 - En **Promovidos y Retenidos**, **ESTUDIANTES EFECTIVOS** escrito en 1º trimestre se replica en
   los tres trimestres para el mismo grado, pero **puede modificarse** libremente en 2º y 3º.
 - En **Promovidos y Retenidos** hay un registro nominal de **estudiantes reprobados** por grado:
@@ -138,11 +140,11 @@ En la cabecera de la sección hay un selector **Tipo de gráfico** con ocho opci
 | Tipo | Uso en esta sección |
 | --- | --- |
 | **Columna** | Comparación de magnitudes discretas: barras verticales de porcentajes, conteos y promedios. |
-| **Línea** | Tendencia de 1º a 3º trimestre, incluido el promedio anual. |
+| **Línea** | Tendencia de 1º a 3º trimestre, incluido el valor anual. |
 | **Pastel** | Los cuatro gráficos se muestran como pastel del periodo elegido en `Periodo`, con partes que siempre suman 100%: avanzados/no avanzados, promovidos/retenidos (sobre cantidades de estudiantes), avanzados/pendientes y promedio/complemento. |
-| **Barras horizontales** | Misma comparación que columnas, con etiquetas largas (`1º TRIMESTRE`, `PROMEDIO ANUAL`) para evitar que el texto se amontone. |
+| **Barras horizontales** | Misma comparación que columnas, con etiquetas largas (`1º TRIMESTRE`, `ANUAL`) para evitar que el texto se amontone. |
 | **Área** | Tendencia con el área inferior rellena, que resalta el volumen acumulado. |
-| **Dispersión XY** | Correlación entre el trimestre (eje X numérico 1, 2, 3) y cada variable (eje Y). Se omite `PROMEDIO ANUAL` porque no es un periodo. |
+| **Dispersión XY** | Correlación entre el trimestre (eje X numérico 1, 2, 3) y cada variable (eje Y). Se omite `ANUAL` porque no es un periodo. |
 | **Histograma** | Distribución de frecuencias de los promedios por grado, agrupados en rangos de 10 puntos (0-9, 10-19, …, 90-100). |
 | **Combinado** | Columnas de conteos o porcentajes junto con líneas de otra unidad en el eje derecho (por ejemplo, promedio general + % de temas avanzados). |
 
@@ -150,7 +152,7 @@ En el modo **Histograma** se muestra una tarjeta única a todo el ancho, porque 
 
 Los reportes descargados desde el celular mantienen **el mismo formato horizontal que en una computadora**: el PDF captura la vista previa con ancho de escritorio (1250 px) y el Word inserta los gráficos renderizados a 1100 px; el Excel ya define `orientation="landscape"` en todas sus hojas.
 
-Los porcentajes se muestran como **números enteros** con signo `%` **debajo de cada gráfico**, en **cuatro columnas alineadas con su barra o punto** (1º, 2º y 3º trimestre, y **PROMEDIO ANUAL**) y con un dato por línea, por ejemplo:
+Los porcentajes se muestran como **números enteros** con signo `%` **debajo de cada gráfico**, en **cuatro columnas alineadas con su barra o punto** (1º, 2º y 3º trimestre, y **ANUAL**) y con un dato por línea, por ejemplo:
 
 ```text
 1º TRIMESTRE
@@ -158,6 +160,8 @@ Temas Avanzados 30%
 Promovidos 88%
 Retenidos 12%
 ```
+
+En la serie de **Temas**, el cuarto valor es la **suma** de los tres trimestres (33% + 34% + 33% = 100% cuando todos están completos), no un promedio; por eso la etiqueta dice **ANUAL**.
 
 Las barras también llevan su porcentaje entero: en el gráfico general se lee `30%` sobre cada barra, y en los gráficos de conteos se lee `308 (88%)`, `482 (30%)`, etc. Las líneas de porcentaje se identifican en la leyenda y usan un eje derecho de 0 a 100, pero **no repiten el valor sobre cada punto** para no recargar el gráfico. El promedio general sigue con dos decimales debajo de su gráfico.
 
@@ -180,6 +184,7 @@ Los gráficos se generan con `chart.js`, cargado bajo demanda al abrir la secci�
 | `npm run init:firestore` | Crea los documentos faltantes en `reportes-academicos/cuadros` (no sobrescribe los existentes) |
 | `npm run verify:firestore` | Comprueba que los 9 documentos existan (ruta nueva o respaldo antiguo) |
 | `npm run migrate:firestore` | Copia las rutas antiguas a la estructura nueva sin sobrescribir lo existente |
+| `npm run backfill:anual` | Copia `T.PROG. ANUAL` a 2º/3º trimestre donde falte, sin sobrescribir valores |
 | `npm run import:data` | Importa `scripts/datos-iniciales.json` reemplazando los 9 documentos |
 | `npm run verify:data` | Compara Firestore contra el JSON importado |
 | `npm run firebase:deploy` | Despliega reglas e índices de Firestore |
