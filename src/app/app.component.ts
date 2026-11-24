@@ -74,8 +74,8 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
               <div class="fs-1 text-primary"><i class="bi {{ o[3] }}"></i></div><div class="fw-bold fs-5">{{ o[1] }}</div><div class="small">{{ o[2] }}</div>
             </button></div>
           }
-          <div class="col-md-6"><button class="btn menu-card w-100 p-4 text-start h-100" (click)="exportar()">
-            <div class="fs-1 text-success"><i class="bi bi-file-earmark-excel"></i></div><div class="fw-bold fs-5">Descargar Excel</div><div class="small">Libro con los 9 cuadros (1º, 2º y 3º trimestre) y hojas de reprobados.</div>
+          <div class="col-md-6"><button class="btn menu-card w-100 p-4 text-start h-100" (click)="abrirGraficos()">
+            <div class="fs-1 text-info"><i class="bi bi-bar-chart-line"></i></div><div class="fw-bold fs-5">Gráficos Estadísticos</div><div class="small">Generales, retenidos y aprobados, temas y promedios de la Unidad Educativa.</div>
           </button></div>
           <div class="col-md-6"><div class="menu-card h-100 p-4">
             <div class="d-flex justify-content-between align-items-start">
@@ -104,8 +104,8 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
               <div class="small text-white-50 mt-2">Abre la vista previa. La descarga se realiza al presionar el botón de descarga.</div>
             </div>
           </div></div>
-          <div class="col-md-6"><button class="btn menu-card w-100 p-4 text-start h-100" (click)="abrirGraficos()">
-            <div class="fs-1 text-info"><i class="bi bi-bar-chart-line"></i></div><div class="fw-bold fs-5">Gráficos Estadísticos</div><div class="small">Generales, retenidos y aprobados, temas y promedios de la Unidad Educativa.</div>
+          <div class="col-md-6"><button class="btn menu-card w-100 p-4 text-start h-100" (click)="exportar()">
+            <div class="fs-1 text-success"><i class="bi bi-file-earmark-excel"></i></div><div class="fw-bold fs-5">Descargar Excel</div><div class="small">Libro con los 9 cuadros (1º, 2º y 3º trimestre) y hojas de reprobados.</div>
           </button></div>
         </div>
       </section>
@@ -305,7 +305,7 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
     @if (vista() === 'form') {
       <div class="row g-2 align-items-center mb-3">
         <div class="col-12 col-sm-auto order-2 order-sm-1">
-          <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="vista.set(admin() ? 'admin' : 'menu')"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
+          <button class="btn btn-danger btn-lg fw-bold shadow w-100" (click)="salir()"><i class="bi bi-arrow-left-circle-fill me-2"></i>Volver al Menú</button>
         </div>
         <div class="col-12 col-sm order-1 order-sm-2">
           <h2 class="h4 mb-0 text-center fw-bold text-uppercase">{{ nombreTipo() }}
@@ -453,7 +453,7 @@ const TIPOS_GRAFICO: TipoGrafico[] = ['columna', 'linea', 'pastel', 'barras', 'a
   @if (vista() === 'previa') {
     <div class="no-print container-fluid bg-light border-bottom py-2">
       <div class="d-flex gap-2 align-items-center flex-wrap">
-        <button class="btn btn-outline-secondary btn-sm" (click)="vista.set('form')">← Volver</button>
+        <button class="btn btn-outline-secondary btn-sm" (click)="salir()">← Volver al Menú</button>
         <button class="btn btn-success btn-sm" (click)="exportarActual()">⬇ Excel (este cuadro)</button>
         <button class="btn btn-danger btn-sm" (click)="descargarPDF()" [disabled]="cargando()">⬇ PDF</button>
         @if (pdfPreparado()) {

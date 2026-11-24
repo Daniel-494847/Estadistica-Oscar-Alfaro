@@ -13,19 +13,22 @@ function borde(estilo: any, extra: any = {}) {
   return { ...estilo, border: { ...REJILLA, ...extra } };
 }
 
+// Estilos alineados con la vista previa/PDF (.hoja/.cuadro en app.component.ts).
 const S: Record<string, any> = {
-  titulo: { font: { name: FUENTE, sz: 14, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } },
-  grado: { font: { name: FUENTE, sz: 11, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'D9E2F3' } } },
-  grupo: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'BDD7EE' } } },
-  area: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'D9E2F3' } } },
-  col: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'center', vertical: 'center', textRotation: 90, wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'E2EFDA' } } },
-  totalTit: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA, fill: { patternType: 'solid', fgColor: { rgb: 'FCE4D6' } } },
-  celda: { font: { name: FUENTE, sz: 10 }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA },
-  porcentaje: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA },
-  filaGrado: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'left', vertical: 'center' }, border: REJILLA },
-  total: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: { ...REJILLA, top: DOBLE }, fill: { patternType: 'solid', fgColor: { rgb: 'FFF2CC' } } },
-  totalEtiqueta: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'left', vertical: 'center' }, border: { ...REJILLA, top: DOBLE }, fill: { patternType: 'solid', fgColor: { rgb: 'FFF2CC' } } },
+  titulo: { font: { name: FUENTE, sz: 13, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } },
+  tituloSub: { font: { name: FUENTE, sz: 11, bold: false }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } },
+  grado: { font: { name: FUENTE, sz: 11, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA },
+  grupo: { font: { name: FUENTE, sz: 9.5, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA },
+  area: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA },
+  col: { font: { name: FUENTE, sz: 7, bold: true }, alignment: { horizontal: 'center', vertical: 'center', textRotation: 90, wrapText: true }, border: REJILLA },
+  totalTit: { font: { name: FUENTE, sz: 9.5, bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: REJILLA },
+  celda: { font: { name: FUENTE, sz: 9 }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA },
+  porcentaje: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: REJILLA },
+  filaGrado: { font: { name: FUENTE, sz: 9, bold: true }, alignment: { horizontal: 'left', vertical: 'center' }, border: REJILLA },
+  total: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: { ...REJILLA, top: DOBLE } },
+  totalEtiqueta: { font: { name: FUENTE, sz: 10, bold: true }, alignment: { horizontal: 'left', vertical: 'center' }, border: { ...REJILLA, top: DOBLE } },
   pie: { font: { name: FUENTE, sz: 11, bold: true }, alignment: { horizontal: 'left', vertical: 'center' } },
+  caja: { font: { name: FUENTE, sz: 11, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: { top: DOBLE, bottom: DOBLE, left: DOBLE, right: DOBLE } },
   lugar: { font: { name: FUENTE, sz: 11, bold: true }, alignment: { horizontal: 'center', vertical: 'center' } },
 };
 
@@ -61,7 +64,7 @@ function imagenDeUri(uri?: string): { ext: 'png' | 'jpeg'; bytes: Uint8Array } |
 }
 
 function dibujo(imagenes: ImagenExcel[]) {
-  const tam = 400000; // ~0.44 in, cabe en la fila del encabezado
+  const tam = 650000; // ~68 px, similar al alto del escudo/icono en la vista previa/PDF
   const piezas = imagenes.map(img => `
 <xdr:oneCellAnchor><xdr:from><xdr:col>${img.columna}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
 <xdr:ext cx="${tam}" cy="${tam}"/><xdr:pic>
@@ -248,7 +251,7 @@ export class ExportService {
 
     m.titulos.forEach((txt, i) => {
       const r = Array(m.ancho).fill('');
-      r[0] = this.celda(txt, { ...S.titulo, font: { ...S.titulo.font, sz: i === 0 ? 14 : 10 } });
+      r[0] = this.celda(txt, i === 0 ? S.titulo : S.tituloSub);
       merges.push({ s: { r: i, c: 0 }, e: { r: i, c: m.ancho - 1 } });
       filas.push(r);
     });
@@ -259,8 +262,28 @@ export class ExportService {
 
     m.pie.forEach((txt, i) => {
       const r = Array(m.ancho).fill('');
-      r[0] = this.celda(txt, i === m.pie.length - 1 && d?.lugar ? S.lugar : S.pie);
-      merges.push({ s: { r: off + m.mat.length + i, c: 0 }, e: { r: off + m.mat.length + i, c: m.ancho - 1 } });
+      const esLugar = i === m.pie.length - 1 && !!d?.lugar;
+      if (esLugar) {
+        r[0] = this.celda(txt, S.lugar);
+        merges.push({ s: { r: off + m.mat.length + i, c: 0 }, e: { r: off + m.mat.length + i, c: m.ancho - 1 } });
+      } else {
+        // Reproduce el pie del PDF: etiqueta a la izquierda y valor en una "caja" con borde doble.
+        const sep = txt.lastIndexOf(': ');
+        if (sep > -1 && m.ancho > 3) {
+          const etiqueta = txt.slice(0, sep + 1);
+          const valor = txt.slice(sep + 2);
+          const colCaja = Math.max(1, m.ancho - 2);
+          r[0] = this.celda(etiqueta, S.pie);
+          merges.push({ s: { r: off + m.mat.length + i, c: 0 }, e: { r: off + m.mat.length + i, c: colCaja - 1 } });
+          r[colCaja] = this.celda(valor, S.caja);
+          if (colCaja < m.ancho - 1) {
+            merges.push({ s: { r: off + m.mat.length + i, c: colCaja }, e: { r: off + m.mat.length + i, c: m.ancho - 1 } });
+          }
+        } else {
+          r[0] = this.celda(txt, S.pie);
+          merges.push({ s: { r: off + m.mat.length + i, c: 0 }, e: { r: off + m.mat.length + i, c: m.ancho - 1 } });
+        }
+      }
       filas.push(r);
     });
 
